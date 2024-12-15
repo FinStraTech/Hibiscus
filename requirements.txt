@@ -2,3 +2,4 @@ pandas
 openpyxl
 datetime 
 streamlit
+xlsxwriter
