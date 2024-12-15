@@ -1007,7 +1007,7 @@ def extract_hierarchy_from_zip(zip_buffer):
     # Supprimer les doublons dans les colonnes en insérant des cellules vides pour éviter la répétition
     def remove_redundancy(rows):
         if not rows or not rows[0]:
-            raise ValueError("Aucune donnée valide dans 'rows' pour traiter la redondance.")
+            st.write("Aucune donnée valide dans 'rows' pour traiter la redondance.")
         for col in range(1, len(rows[0])):  # Parcours des colonnes, sauf Level 1 (colonne 0)
             previous_value = None
             for row in rows:
