@@ -1619,9 +1619,9 @@ if __name__ == "__main__":
                     unsafe_allow_html=True,
                 )
                 try:
-                    with open("./Livrable/Tool_System/Rapport_Specification_Fonctionnelle_Hibiscus.pdf", "rb") as file:
+                    with open("./Livrable/Tool_System/User Guide.pdf", "rb") as file:
                         st.download_button(
-                            label="📤 User Guide ",
+                            label="📤 Télécharger User Guide ",
                             data=file,
                             file_name="logic_documentation.pdf",
                             mime="application/pdf",
@@ -1643,7 +1643,7 @@ if __name__ == "__main__":
                     unsafe_allow_html=True,
                 )
                 try:
-                    with open("./Livrable/Tool_System/User Guide.pdf", "rb") as file:
+                    with open("./Livrable/Tool_System/Rapport_Specification_Fonctionnelle_Hibiscus.pdf", "rb") as file:
                         st.download_button(
                             label="📤 Télécharger PDF Technique",
                             data=file,
