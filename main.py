@@ -1446,7 +1446,7 @@ if __name__ == "__main__":
                                     "args": [
                                         preprocessed_data, input_file_path, "./Ref 2/ref_entite.xlsx",
                                         "./Ref 2/ref_transfo_l1.xlsx", "./Ref 2/ref_lcr.xlsx",
-                                        "./Ref 2/tef_lcr_adf.xlsx", "./Livrable/Templates/LCR_Template.xlsx",
+                                        "./Ref 2/ref_lcr_adf.xlsx", "./Livrable/Templates/LCR_Template.xlsx",
                                         run_timestamp, export_type, zip_buffer, entity, currency, indicator
                                     ],
                                 },
