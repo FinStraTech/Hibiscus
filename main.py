@@ -1464,7 +1464,7 @@ if __name__ == "__main__":
                                     "func": process_almm,
                                     "args": [
                                         preprocessed_data, input_file_path, "./Ref 2/ref_entite.xlsx",
-                                        "./Ref 2/ref_transfo_L1.xlsx", "./Ref 2/ref_nsfr.xlsx",
+                                        "./Ref 2/ref_transfo_l1.xlsx", "./Ref 2/ref_nsfr.xlsx",
                                         "./Ref 2/ref_nsfr_adf.xlsx", "./Ref 2/ref_dzone_nsfr.xlsx",
                                         "./Livrable/Templates/ALMM_Template.xlsx", run_timestamp,
                                         export_type, zip_buffer, entity, currency, indicator
