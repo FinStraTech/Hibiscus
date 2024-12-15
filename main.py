@@ -1398,7 +1398,7 @@ if __name__ == "__main__":
                             current_task_placeholder.text("Prétraitement des données...")
                             preprocessed_data = preprocess_all_data(
                                 data_path=input_file_path,
-                                ref_entite_path="./Ref 2/Ref_Entite.xlsx",
+                                ref_entite_path="./Ref 2/ref_entite.xlsx",
                                 ref_transfo_path="./Ref 2/Ref_Transfo_L1.xlsx",
                                 ref_lcr_path="./Ref 2/Ref_LCR.xlsx",
                                 ref_adf_lcr_path="./Ref 2/Ref_lcr_adf.xlsx",
