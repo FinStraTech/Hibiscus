@@ -1399,9 +1399,9 @@ if __name__ == "__main__":
                             preprocessed_data = preprocess_all_data(
                                 data_path=input_file_path,
                                 ref_entite_path="./Ref 2/ref_entite.xlsx",
-                                ref_transfo_path="./Ref 2/Ref_Transfo_L1.xlsx",
-                                ref_lcr_path="./Ref 2/Ref_LCR.xlsx",
-                                ref_adf_lcr_path="./Ref 2/Ref_lcr_adf.xlsx",
+                                ref_transfo_path="./Ref 2/ref_transfo_l1.xlsx",
+                                ref_lcr_path="./Ref 2/ref_lcr.xlsx",
+                                ref_adf_lcr_path="./Ref 2/ref_lcr_adf.xlsx",
                                 input_excel_path="./Livrable/Templates/LCR_Template.xlsx",
                                 run_timestamp=run_timestamp,
                                 export_type=export_type,
@@ -1434,9 +1434,9 @@ if __name__ == "__main__":
                                 "NSFR": {
                                     "func": process_nsfr,
                                     "args": [
-                                        preprocessed_data, input_file_path, "./Ref 2/Ref_Entite.xlsx",
-                                        "./Ref 2/Ref_Transfo_L1.xlsx", "./Ref 2/Ref_NSFR.xlsx",
-                                        "./Ref 2/Ref_nsfr_adf.xlsx", "./Ref 2/Ref_dzone_nsfr.xlsx",
+                                        preprocessed_data, input_file_path, "./Ref 2/ref_entite.xlsx",
+                                        "./Ref 2/ref_transfo_l1.xlsx", "./Ref 2/ref_nsfr.xlsx",
+                                        "./Ref 2/Ref_nsfr_adf.xlsx", "./Ref 2/ref_dzone_nsfr.xlsx",
                                         "./Livrable/Templates/NSFR_Template.xlsx", run_timestamp,
                                         export_type, zip_buffer, entity, currency, indicator
                                     ],
@@ -1444,18 +1444,18 @@ if __name__ == "__main__":
                                 "LCR": {
                                     "func": process_lcr,
                                     "args": [
-                                        preprocessed_data, input_file_path, "./Ref 2/Ref_Entite.xlsx",
-                                        "./Ref 2/Ref_Transfo_L1.xlsx", "./Ref 2/Ref_LCR.xlsx",
-                                        "./Ref 2/Ref_lcr_adf.xlsx", "./Livrable/Templates/LCR_Template.xlsx",
+                                        preprocessed_data, input_file_path, "./Ref 2/ref_entite.xlsx",
+                                        "./Ref 2/ref_transfo_l1.xlsx", "./Ref 2/ref_lcr.xlsx",
+                                        "./Ref 2/tef_lcr_adf.xlsx", "./Livrable/Templates/LCR_Template.xlsx",
                                         run_timestamp, export_type, zip_buffer, entity, currency, indicator
                                     ],
                                 },
                                 "QIS": {
                                     "func": process_qis,
                                     "args": [
-                                        preprocessed_data, input_file_path, "./Ref 2/Ref_Entite.xlsx",
-                                        "./Ref 2/Ref_Transfo_L1.xlsx", "./Ref 2/Ref_QIS.xlsx",
-                                        "./Ref 2/Ref_nsfr_adf.xlsx", "./Ref 2/Ref_dzone_nsfr.xlsx",
+                                        preprocessed_data, input_file_path, "./Ref 2/ref_entite.xlsx",
+                                        "./Ref 2/ref_transfo_l1.xlsx", "./Ref 2/Ref_QIS.xlsx",
+                                        "./Ref 2/ref_nsfr_adf.xlsx", "./Ref 2/ref_dzone_nsfr.xlsx",
                                         "./Livrable/Templates/QIS_Template.xlsx", run_timestamp,
                                         export_type, zip_buffer, entity, currency, indicator
                                     ],
@@ -1463,9 +1463,9 @@ if __name__ == "__main__":
                                 "ALMM": {
                                     "func": process_almm,
                                     "args": [
-                                        preprocessed_data, input_file_path, "./Ref 2/Ref_Entite.xlsx",
-                                        "./Ref 2/Ref_Transfo_L1.xlsx", "./Ref 2/Ref_NSFR.xlsx",
-                                        "./Ref 2/Ref_nsfr_adf.xlsx", "./Ref 2/Ref_dzone_nsfr.xlsx",
+                                        preprocessed_data, input_file_path, "./Ref 2/ref_entite.xlsx",
+                                        "./Ref 2/ref_transfo_L1.xlsx", "./Ref 2/ref_nsfr.xlsx",
+                                        "./Ref 2/ref_nsfr_adf.xlsx", "./Ref 2/ref_dzone_nsfr.xlsx",
                                         "./Livrable/Templates/ALMM_Template.xlsx", run_timestamp,
                                         export_type, zip_buffer, entity, currency, indicator
                                     ],
@@ -1473,9 +1473,9 @@ if __name__ == "__main__":
                                 "AER": {
                                     "func": process_aer,
                                     "args": [
-                                        preprocessed_data, input_file_path, "./Ref 2/Ref_Entite.xlsx",
-                                        "./Ref 2/Ref_Transfo_L1.xlsx", "./Ref 2/Ref_AER.xlsx",
-                                        "./Ref 2/Ref_aer_adf.xlsx", "./Livrable/Templates/AER_Template.xlsx",
+                                        preprocessed_data, input_file_path, "./Ref 2/ref_entite.xlsx",
+                                        "./Ref 2/ref_transfo_l1.xlsx", "./Ref 2/Ref_aer.xlsx",
+                                        "./Ref 2/ref_aer_adf.xlsx", "./Livrable/Templates/AER_Template.xlsx",
                                         run_timestamp, export_type, zip_buffer, entity, currency, indicator
                                     ],
                                 },
