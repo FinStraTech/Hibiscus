@@ -1016,17 +1016,17 @@ def extract_hierarchy_from_zip(zip_buffer):
                 else:
                     previous_value = row[col]
         return rows
-
+    df = hierarchy
     #rows = remove_redundancy(rows)
 
     # Trouver la profondeur maximale
-    max_depth = max(len(row) for row in rows)
+    #max_depth = max(len(row) for row in rows)
 
     # Compléter les lignes avec des colonnes vides jusqu'à la profondeur maximale
-    structured_rows = [row + [''] * (max_depth - len(row)) for row in rows]
+    #structured_rows = [row + [''] * (max_depth - len(row)) for row in rows]
 
     # Construire un DataFrame
-    df = pd.DataFrame(structured_rows, columns=[f"Level {i}" for i in range(max_depth)])
+    #df = pd.DataFrame(structured_rows, columns=[f"Level {i}" for i in range(max_depth)])
     return df
 
 
