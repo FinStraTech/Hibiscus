@@ -1554,10 +1554,7 @@ if __name__ == "__main__":
                             current_task_placeholder.success("Traitement terminé avec succès !")
 
                     except Exception as e:
-                        import traceback
-                        current_task_placeholder.text(f"Une erreur est survenue : {e}")
-                        st.text("Traceback détaillé :")
-                        st.text(traceback.format_exc())
+                        st.write(e)
 
         else:
             st.markdown('<div class="feature-description bold">Importez un fichier et choisissez la méthode pour exporter et autres filtres si nécessaire.</div>', unsafe_allow_html=True)
