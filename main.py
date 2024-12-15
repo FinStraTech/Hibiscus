@@ -1002,7 +1002,7 @@ def extract_hierarchy_from_zip(zip_buffer):
     # Extraire les lignes structurées
     rows = traverse_hierarchy(hierarchy)
     if not rows:
-        raise ValueError("La hiérarchie extraite est vide. Vérifiez les fichiers dans le ZIP.")
+        st.write("La hiérarchie extraite est vide. Vérifiez les fichiers dans le ZIP.")
 
     # Supprimer les doublons dans les colonnes en insérant des cellules vides pour éviter la répétition
     def remove_redundancy(rows):
