@@ -989,21 +989,25 @@ def extract_hierarchy_from_zip(zip_buffer):
 
     # Fonction récursive pour transformer la hiérarchie en lignes
     def traverse_hierarchy(node, depth=0, path=[]):
+        if not node:
+            return []
         rows = []
         for key, value in node.items():
             new_path = path + [''] * (depth - len(path)) + [key]
             rows.append(new_path)
             if isinstance(value, dict):  # Si c'est un dossier, continuer la traversée
                 rows.extend(traverse_hierarchy(value, depth + 1, new_path))
-            else:
-                rows.append(new_path + [value])  # Ajouter les fichiers
         return rows
 
     # Extraire les lignes structurées
     rows = traverse_hierarchy(hierarchy)
+    if not rows:
+        raise ValueError("La hiérarchie extraite est vide. Vérifiez les fichiers dans le ZIP.")
 
     # Supprimer les doublons dans les colonnes en insérant des cellules vides pour éviter la répétition
     def remove_redundancy(rows):
+        if not rows or not rows[0]:
+            raise ValueError("Aucune donnée valide dans 'rows' pour traiter la redondance.")
         for col in range(1, len(rows[0])):  # Parcours des colonnes, sauf Level 1 (colonne 0)
             previous_value = None
             for row in rows:
@@ -1022,8 +1026,9 @@ def extract_hierarchy_from_zip(zip_buffer):
     structured_rows = [row + [''] * (max_depth - len(row)) for row in rows]
 
     # Construire un DataFrame
-    df = pd.DataFrame(structured_rows, columns=[f"Level {i}" for i in range(0,max_depth)])
+    df = pd.DataFrame(structured_rows, columns=[f"Level {i}" for i in range(max_depth)])
     return df
+
 
 def process_generic(data, ref_paths, run_timestamp, export_type, zip_buffer, entity=None, currency=None):
     """
