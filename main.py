@@ -1200,9 +1200,9 @@ if __name__ == "__main__":
         #MainMenu {visibility: hidden;} /* Cache le menu principal */
         footer {visibility: hidden;}   /* Cache le footer */
         .css-1vbd788 {display: none;}  /* Cache le sélecteur de thème */
-        .viewerBadge_container__1QSob {display: none;}  /* Cache le bouton 'Fork' */
-        .viewerBadge_link__yUdr6 {display: none;}  /* Cache l'icône GitHub */
-        .viewerBadge_container__1QSob a {display: none;}  /* Supprime tous les liens de badge */
+        .viewerBadge_container__1QSob {display: hidden;}  /* Cache le bouton 'Fork' */
+        .viewerBadge_link__yUdr6 {display: hidden;}  /* Cache l'icône GitHub */
+        .viewerBadge_container__1QSob a {display: hidden;}  /* Supprime tous les liens de badge */
         </style>
     """
     st.markdown(custom_css, unsafe_allow_html=True)
