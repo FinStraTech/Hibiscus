@@ -1,0 +1,7 @@
+[theme]
+base="dark"
+primaryColor="#1db954"  # (optionnel) Couleur principale personnalisée
+backgroundColor="#121212"  # (optionnel) Couleur de l'arrière-plan
+secondaryBackgroundColor="#1e1e1e"  # (optionnel) Couleur du fond secondaire
+textColor="#ffffff"  # (optionnel) Couleur du texte
+font="sans serif"  # (optionnel) Police utilisée
