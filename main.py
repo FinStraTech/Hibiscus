@@ -1197,12 +1197,16 @@ if __name__ == "__main__":
     st.title("HIBISCUS Generator.")
     custom_css = """
         <style>
-        #MainMenu {visibility: hidden;} /* Cache le menu principal */
-        footer {visibility: hidden;}   /* Cache le footer */
-        .css-1vbd788 {display: none;}  /* Cache le sélecteur de thème */
-        .viewerBadge_container__1QSob {display: hidden;}  /* Cache le bouton 'Fork' */
-        .viewerBadge_link__yUdr6 {display: hidden;}  /* Cache l'icône GitHub */
-        .viewerBadge_container__1QSob a {display: hidden;}  /* Supprime tous les liens de badge */
+        /* Cacher le menu principal et le footer */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+
+        /* Cacher le badge Viewer (Fork & GitHub) */
+        .viewerBadge_container__1QSob {display: none !important;}
+        .viewerBadge_link__yUdr6 {display: none !important;}
+
+        /* Supprimer tout lien GitHub */
+        a[href*="github.com"] {display: none !important;}
         </style>
     """
     st.markdown(custom_css, unsafe_allow_html=True)
