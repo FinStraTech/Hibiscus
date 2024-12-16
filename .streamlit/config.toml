@@ -1,9 +1,5 @@
 [theme]
-base = "dark"  # Imposer le thème sombre
-primaryColor = "#1DB954"  # Facultatif, vous pouvez définir la couleur principale de votre app
-secondaryBackgroundColor = "#262730"  # Couleur de fond secondaire
-backgroundColor = "#0e1117"  # Couleur de fond principale
-textColor = "#ffffff"  # Couleur du texte
+base = "dark"
 
 [server]
-showAppSourceLink = false  # Supprimer le bouton "View app source"
+showAppSourceLink = false  # Désactive le bouton "View app source"
