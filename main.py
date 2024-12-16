@@ -1050,14 +1050,17 @@ def process_generic(data, ref_paths, run_timestamp, export_type, zip_buffer, ent
 
 
     
-def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFrame) -> pd.DataFrame:
+def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFrame) -> tuple:
     """
-    Compte les occurrences des entités au niveau 3 dans la hiérarchie et retourne un DataFrame.
-    Les entités ayant le même nom sont regroupées, et leurs occurrences sont additionnées.
+    Compte les occurrences des entités au niveau 3 dans la hiérarchie et retourne deux DataFrames :
+    1. Un DataFrame contenant les entités regroupées et leurs occurrences additionnées.
+    2. Un DataFrame avec les colonnes 'indicateur' et 'nombre d'occurrences' pour les mots-clés spécifiques.
     
     :param export_type: Le type d'export (e.g., ALL, BILAN, CONSO).
     :param hierarchy_df: DataFrame contenant la hiérarchie (niveaux 1 à N).
-    :return: DataFrame contenant les entités regroupées et leurs occurrences additionnées.
+    :return: Tuple contenant deux DataFrames :
+             - DataFrame regroupé des entités.
+             - DataFrame des mots-clés spécifiques.
     """
     # Nettoyer les espaces inutiles des colonnes
     hierarchy_df.columns = hierarchy_df.columns.str.strip()
@@ -1085,6 +1088,13 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
     last_entity = None
     current_count = 0
 
+    # Variables pour compter les mots-clés spécifiques
+    lcr_count = 0
+    aer_count = 0
+    nsfr_count = 0
+    qis_count = 0
+    almm_count = 0
+
     # Parcourir les lignes filtrées
     for _, row in filtered_df_2.iterrows():
         entity = row['Level 3']
@@ -1104,6 +1114,13 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
         if pd.notna(file_name):
             current_count += 1
 
+            # Compter les occurrences des mots-clés spécifiques
+            lcr_count += file_name.count('LCR')
+            aer_count += file_name.count('AER')
+            nsfr_count += file_name.count('NSFR')
+            qis_count += file_name.count('QIS')
+            almm_count += file_name.count('ALMM')
+
     # Ajouter la dernière entité et son comptage (si applicable)
     if last_entity is not None:
         entity_list.append(last_entity)
@@ -1118,7 +1135,13 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
     # Regrouper les entités ayant le même nom et additionner leurs occurrences
     grouped_result_df = result_df.groupby("Entités", as_index=False).agg({"Nombre d'occurrences": "sum"})
 
-    return grouped_result_df
+    # Créer un DataFrame pour les mots-clés spécifiques
+    indicators_df = pd.DataFrame({
+        'indicateur': ['LCR', 'AER', 'NSFR', 'QIS', 'ALMM'],
+        'nombre d\'occurrences': [lcr_count, aer_count, nsfr_count, qis_count, almm_count]
+    })
+
+    return grouped_result_df, indicators_df
 
 
 
@@ -1528,11 +1551,13 @@ if __name__ == "__main__":
                                 # Ajouter le fichier des occurrences uniquement si ce n'est pas GRAN
                                 if export_type != "GRAN":
                                     count_file_path = os.path.join(temp_dir, "count_all.xlsx")
-                                    count_df = count_entity_occurrences_from_df(export_type, hierarchy_df)
-
-                                    # Ajouter les entités manquantes avec 0 occurrences
+                                    
+                                    # Obtenir les deux DataFrames
+                                    grouped_count_df, indicators_df = count_entity_occurrences_from_df(export_type, hierarchy_df)
+                                    
+                                    # Ajouter les entités manquantes avec 0 occurrences au DataFrame des entités
                                     all_entities = set(Entity_List)
-                                    existing_entities = set(count_df["Entités"])
+                                    existing_entities = set(grouped_count_df["Entités"])
                                     missing_entities = all_entities - existing_entities
 
                                     # Ajouter les entités manquantes au DataFrame
@@ -1540,10 +1565,19 @@ if __name__ == "__main__":
                                         "Entités": list(missing_entities),
                                         "Nombre d'occurrences": [0] * len(missing_entities)
                                     })
-                                    count_df = pd.concat([count_df, missing_df], ignore_index=True)
+                                    grouped_count_df = pd.concat([grouped_count_df, missing_df], ignore_index=True)
 
-                                    count_df.to_excel(count_file_path, index=False)
-                                    zipf.write(count_file_path, arcname="count_all.xlsx")
+                                    # Écrire les deux DataFrames dans un fichier Excel
+                                    with pd.ExcelWriter(count_file_path, engine='openpyxl') as writer:
+                                        # Écrire le premier DataFrame
+                                        grouped_count_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=0)
+                                        
+                                        # Ajouter 5 lignes vides avant le second DataFrame
+                                        start_row = len(grouped_count_df) + 6  # 1 ligne pour l'en-tête + 5 lignes vides
+                                        indicators_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=start_row)
+                                    
+                                    # Ajouter le fichier Excel dans le ZIP
+                                    zipf.write(count_file_path, arcname="KPI.xlsx")
 
                             progress_bar.progress(90)
 
