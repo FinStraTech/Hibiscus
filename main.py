@@ -1194,6 +1194,10 @@ def save_excel_with_structure(
     st.success("Données sauvegardées avec succès dans le ZIP.")
 
 if __name__ == "__main__":
+    st.write("Configuration actuelle :")
+    st.write(st.config.get_option("theme.base"))
+    st.write(st.config.get_option("server.showAppSourceLink"))
+    st.write(st.config.get_option("ui.hideThemeSelector"))
     st.title("HIBISCUS Generator.")
     run_timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     # Initialiser l'état de navigation
@@ -1408,7 +1412,7 @@ if __name__ == "__main__":
                                 currency=currency,
                             )
                             progress_bar.progress(20)
-
+                            
                             # Vérification du type de données retournées
                             if export_type == "GRAN":
                                 if "filtered_data" in preprocessed_data:
@@ -1494,20 +1498,15 @@ if __name__ == "__main__":
                                     print(f"Processus '{process_name}' non reconnu.")
                                 progress_bar.progress(step_progress + (i * int(30 / len(selected_processes))))
 
-                            # Étape 4 : Génération des fichiers de hiérarchie
                             current_task_placeholder.text("Génération des fichiers de hiérarchie...")
                             hierarchy_file_path = os.path.join(temp_dir, "hierarchy_all.xlsx")
                             hierarchy_df = extract_hierarchy_from_zip(zip_buffer)
-
-                            # Remplacer les doublons par NaN avant de sauvegarder
                             hierarchy_df = replace_duplicates_with_nan(hierarchy_df)
 
                             hierarchy_df.to_excel(hierarchy_file_path, index=False)
 
-                            # Étape 5 : Ajouter les fichiers au ZIP
                             current_task_placeholder.text("Ajout des fichiers au ZIP final...")
                             with zipfile.ZipFile(zip_buffer, "a") as zipf:
-                                # Ajouter les fichiers d'import dans un dossier nommé import_<run_timestamp>
                                 for key, import_file_path in generated_import_files.items():
                                     arcname = f"import_{run_timestamp}/{os.path.basename(import_file_path)}"
                                     zipf.write(import_file_path, arcname=arcname)

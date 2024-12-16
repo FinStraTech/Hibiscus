@@ -1,5 +1,9 @@
 [theme]
-base = "light"
+base = "dark"
 
 [server]
-showAppSourceLink = false  # Désactive le bouton "View app source"
+enableXsrfProtection = true  # Sécurité recommandée
+showAppSourceLink = false    # Cache le bouton "View app source"
+
+[ui]
+hideThemeSelector = true  # Empêche l'utilisateur de changer de thème
