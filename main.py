@@ -1195,15 +1195,18 @@ def save_excel_with_structure(
 
 if __name__ == "__main__":
     st.title("HIBISCUS Generator.")
-    # Injecter du CSS personnalisé pour masquer des éléments de l'interface
-    hide_menu_style = """
+    # Injecter du CSS personnalisé pour cacher les boutons et forcer le mode dark
+    custom_css = """
         <style>
-        #MainMenu {visibility: hidden;} /* Cache le menu "hamburger" */
+        #MainMenu {visibility: hidden;} /* Cache le menu principal */
         footer {visibility: hidden;}   /* Cache le footer */
         .css-1vbd788 {display: none;}  /* Cache le sélecteur de thème */
+        .viewerBadge_container__1QSob {display: none;}  /* Cache le bouton 'Fork' */
+        .st-bb {background-color: #0e1117;} /* Force l'arrière-plan en mode dark */
+        .st-at {display: none;}  /* Cache l'icône GitHub */
         </style>
     """
-    st.markdown(hide_menu_style, unsafe_allow_html=True)
+    st.markdown(custom_css, unsafe_allow_html=True)
     run_timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     # Initialiser l'état de navigation
     if "menu_choice" not in st.session_state:
