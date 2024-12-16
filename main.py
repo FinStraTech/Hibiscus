@@ -1195,9 +1195,9 @@ def save_excel_with_structure(
 
 if __name__ == "__main__":
     st.write("Configuration actuelle :")
-    st.write(st.config.get_option("theme.base"))
-    st.write(st.config.get_option("server.showAppSourceLink"))
-    st.write(st.config.get_option("ui.hideThemeSelector"))
+    st.title("Configuration Streamlit")
+    config_keys = {key: st.config.get_option(key) for key in st.config._config.keys()}
+    st.json(config_keys)
     st.title("HIBISCUS Generator.")
     run_timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     # Initialiser l'état de navigation
