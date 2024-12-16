@@ -1195,6 +1195,15 @@ def save_excel_with_structure(
 
 if __name__ == "__main__":
     st.title("HIBISCUS Generator.")
+    # Injecter du CSS personnalisé pour masquer des éléments de l'interface
+    hide_menu_style = """
+        <style>
+        #MainMenu {visibility: hidden;} /* Cache le menu "hamburger" */
+        footer {visibility: hidden;}   /* Cache le footer */
+        .css-1vbd788 {display: none;}  /* Cache le sélecteur de thème */
+        </style>
+    """
+    st.markdown(hide_menu_style, unsafe_allow_html=True)
     run_timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     # Initialiser l'état de navigation
     if "menu_choice" not in st.session_state:
