@@ -1,9 +1,9 @@
 [theme]
-base = "dark"
+base = "dark"  # Imposer le mode dark
 
 [server]
-enableXsrfProtection = true  # Sécurité recommandée
-showAppSourceLink = false    # Cache le bouton "View app source"
+enableCORS = false
+allowRunOnSave = false
 
-[ui]
-hideThemeSelector = true  # Empêche l'utilisateur de changer de thème
+[browser]
+gatherUsageStats = false  # Désactive les statistiques
