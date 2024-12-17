@@ -13,6 +13,7 @@ import shutil
 import tempfile
 import zipfile
 from openpyxl import load_workbook
+from io import BytesIO
 
 Entity_List = ['BANCO SOCIETE GENERALE BRASIL SA','BPCE LEASE','FRAER LEASING SPA','FRANFINANCE','FRANFINANCE LOCATION','GEFA BANK GMBH','GERMAN NEWCO','GERMAN NEWCO','MILLA','PHILIPS MEDICAL CAPITAL FRANCE','SG EQUIPMENT FINANCE BENELUX BV','SG EQUIPMENT FINANCE CZECH REPUBLIC','SG EQUIPMENT FINANCE GMBH','SG EQUIPMENT FINANCE IBERIA','SG EQUIPMENT FINANCE ITALY SPA','SG EQUIPMENT FINANCE SCHWEIZ AG','SG EQUIPMENT FINANCE USA CORP','SG EQUIPMENT LEASING POLSKA SP ZO','SG EQUIPMENT LEASING POLSKA SP ZO','SG LEASING SPA','SGEF SA','SGEF SA ARRENDAMENTO MERCANTIL','SOCIETE GENERALE EQUIPMENT FINANCE Brazil','SOCIETE GENERALE EQUIPMENT FINANCE UK','SOCIETE GENERALE LEASING AND RENTING China']
 expected_columns = [
@@ -86,12 +87,12 @@ def preprocess_all_data(data_path, ref_entite_path, ref_transfo_path, ref_lcr_pa
 
 
 def process_aer(preprocessed_data,
-    data_path, ref_entite_path, ref_transfo_path, ref_aer_path, ref_adf_aer_path, 
-    input_excel_path, run_timestamp, export_type, zip_buffer, 
-    entity=None, currency=None, indicator="ALL"
-):
+                data_path, ref_entite_path, ref_transfo_path, ref_aer_path, ref_adf_aer_path,
+                input_excel_path, run_timestamp, export_type, zip_buffer,
+                entity=None, currency=None, indicator="ALL"):
     """
-    Processus pour traiter les données AER avec gestion spécifique des exports dans un ZIP.
+    Processus pour traiter les données AER avec gestion spécifique des exports dans un ZIP,
+    incluant la transition des données vers un fichier template.
     """
     base_folder = f"RUN_{run_timestamp}_{export_type}"  # Dossier racine dans le ZIP
 
@@ -105,25 +106,22 @@ def process_aer(preprocessed_data,
 
             # Filtrer les données pour GRAN
             if isinstance(preprocessed_data, pd.DataFrame):
-                # Si c'est un DataFrame, afficher ses colonnes
                 if "D_CU" not in preprocessed_data.columns:
                     raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
                 filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
             elif isinstance(preprocessed_data, dict):
-                # Si c'est un dictionnaire, accéder à la clé "filtered_data"
                 if "filtered_data" in preprocessed_data:
                     filtered_data = preprocessed_data["filtered_data"]
                     if "D_CU" not in filtered_data.columns:
                         raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
                     filtered_data = filtered_data[filtered_data["D_CU"] == currency]
                 else:
-                    raise ValueError("La clé 'filtered_data' est absente dans preprocessed_lcr_data.")
+                    raise ValueError("La clé 'filtered_data' est absente dans preprocessed_data.")
             else:
-                raise TypeError("preprocessed_lcr_data doit être un DataFrame ou un dictionnaire.")
+                raise TypeError("preprocessed_data doit être un DataFrame ou un dictionnaire.")
 
-            # Vérifier si 'filtered_data' est valide
             if filtered_data.empty:
-                st.error(f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN.")
+                raise ValueError(f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN.")
 
             # Étape 2 : Filtrer par indicateur
             if indicator == "BILAN":
@@ -131,7 +129,7 @@ def process_aer(preprocessed_data,
             elif indicator == "CONSO":
                 filtered_data = filtered_data[filtered_data["D_T1"] != "INTER"]
             elif indicator == "ALL":
-                filtered_data = filtered_data
+                pass  # Ne rien filtrer
             else:
                 raise ValueError("Indicateur non pris en charge. Choisissez parmi ALL, BILAN, ou CONSO.")
 
@@ -159,18 +157,13 @@ def process_aer(preprocessed_data,
             # Filtrer par entité
             final_result = final_result[final_result["Ref_Entite.entité"] == entity]
 
-            # Sauvegarder dans le ZIP
+            # Transition vers le fichier template
+            buffer = apply_to_template(final_result, input_excel_path)
+
+            # Ajouter au ZIP
             folder_path = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
             file_name = f"{folder_path}/AER_GRAN_{currency}_{entity}.xlsx"
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_file_path = os.path.join(temp_dir, "temp_output.xlsx")
-                try:
-                    final_result.to_excel(temp_file_path, index=False, engine="xlsxwriter")
-                    zipf.write(temp_file_path, arcname=file_name)
-                except PermissionError as e:
-                    print(f"Erreur de permission lors de la création du fichier : {e}")
-                except Exception as e:
-                    print(f"Une erreur inattendue s'est produite : {e}")
+            zipf.writestr(file_name, buffer.getvalue())
 
         else:  # Cas ALL, BILAN, CONSO
             for currency, file_path in preprocessed_data.items():
@@ -207,37 +200,50 @@ def process_aer(preprocessed_data,
                 grouped_result = aer_processor.group_and_join_ref_adf_aer(result_with_aer)
                 final_result = aer_processor.add_adjusted_amount(grouped_result)
 
-                # Sauvegarder le fichier global
+                # Transition vers le fichier template
+                buffer = apply_to_template(final_result, input_excel_path)
+
+                # Ajouter au ZIP
                 folder_path_global = f"{base_folder}/{currency}/Reports_all_entities"
                 file_name_global = f"{folder_path_global}/AER_{export_type}_{currency}_All_Entities.xlsx"
-                with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                    final_result.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                    zipf.write(temp_file.name, arcname=file_name_global)
-
-                # Sauvegarder les fichiers par entité
-                for entity in final_result["Ref_Entite.entité"].unique():
-                    entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
-                    if entity_data.empty:
-                        continue
-                    folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
-                    file_name_entity = f"{folder_path_entity}/AER_{export_type}_{currency}_{entity}.xlsx"
-                    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                        entity_data.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                        zipf.write(temp_file.name, arcname=file_name_entity)
+                zipf.writestr(file_name_global, buffer.getvalue())
+                
+                # Ne générer que les rapports globaux si export_type == 'ALL'
+                if export_type == 'ALL':
+                    continue
+                else:
+                    # Sauvegarder les fichiers par entité
+                    for entity in final_result["Ref_Entite.entité"].unique():
+                        entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
+                        if entity_data.empty:
+                            continue
+                        buffer_entity = apply_to_template(entity_data, input_excel_path)
+                        folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
+                        file_name_entity = f"{folder_path_entity}/AER_{export_type}_{currency}_{entity}.xlsx"
+                        zipf.writestr(file_name_entity, buffer_entity.getvalue())
 
     print("Tous les fichiers AER ont été ajoutés au ZIP.")
 
 
-
-
-
-def process_qis(preprocessed_data, 
-    data_path, ref_entite_path, ref_transfo_path, ref_qis_path, ref_adf_qis_path, 
-    ref_dzone_qis_path, input_excel_path, run_timestamp, export_type, zip_buffer, 
-    entity=None, currency=None, indicator="ALL"
+def process_qis(
+    preprocessed_data,
+    data_path,
+    ref_entite_path,
+    ref_transfo_path,
+    ref_qis_path,
+    ref_adf_qis_path,
+    ref_dzone_qis_path,
+    input_excel_path,
+    run_timestamp,
+    export_type,
+    zip_buffer,
+    entity=None,
+    currency=None,
+    indicator="ALL"
 ):
     """
-    Processus pour traiter les données QIS avec gestion spécifique des exports dans un ZIP.
+    Processus pour traiter les données QIS avec gestion spécifique des exports dans un ZIP,
+    incluant la transition des données vers un fichier template.
     """
     base_folder = f"RUN_{run_timestamp}_{export_type}"  # Dossier racine dans le ZIP
 
@@ -250,26 +256,9 @@ def process_qis(preprocessed_data,
 
             # Filtrer les données pour GRAN
             if isinstance(preprocessed_data, pd.DataFrame):
-                # Si c'est un DataFrame, afficher ses colonnes
-                if "D_CU" not in preprocessed_data.columns:
-                    raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
                 filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
-            elif isinstance(preprocessed_data, dict):
-                # Si c'est un dictionnaire, accéder à la clé "filtered_data"
-                if "filtered_data" in preprocessed_data:
-                    filtered_data = preprocessed_data["filtered_data"]
-                    if "D_CU" not in filtered_data.columns:
-                        raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                    filtered_data = filtered_data[filtered_data["D_CU"] == currency]
-                else:
-                    raise ValueError("La clé 'filtered_data' est absente dans preprocessed_lcr_data.")
             else:
-                raise TypeError("preprocessed_lcr_data doit être un DataFrame ou un dictionnaire.")
-
-            # Vérifier si 'filtered_data' est valide
-            if filtered_data.empty:
-                st.error(f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN.")
-
+                raise TypeError("preprocessed_data doit être un DataFrame pour un export de type GRAN.")
 
             # Étape 2 : Filtrer par indicateur
             if indicator == "BILAN":
@@ -277,12 +266,12 @@ def process_qis(preprocessed_data,
             elif indicator == "CONSO":
                 filtered_data = filtered_data[filtered_data["D_T1"] != "INTER"]
             elif indicator == "ALL":
-                filtered_data = filtered_data
+                pass  # Ne rien filtrer
             else:
                 raise ValueError("Indicateur non pris en charge. Choisissez parmi ALL, BILAN, ou CONSO.")
 
             if filtered_data.empty:
-                raise ValueError(f"Aucune donnée trouvée pour l'indicateur '{indicator}'.")
+                raise ValueError(f"Aucune donnée trouvée pour la devise '{currency}' et l'indicateur '{indicator}'.")
 
             # Initialiser la classe QIS
             qis_processor = QIS(
@@ -296,7 +285,6 @@ def process_qis(preprocessed_data,
                 export_type=export_type,
             )
 
-            # Appliquer les transformations
             result_after_entite = qis_processor.filter_and_join_ref_entite(filtered_data)
             result_after_transfo = qis_processor.join_with_ref_transfo(result_after_entite)
             result_with_dzone_qis = qis_processor.join_with_ref_dzone_qis(result_after_transfo)
@@ -309,18 +297,13 @@ def process_qis(preprocessed_data,
             # Filtrer par entité
             final_result = final_result[final_result["Ref_Entite.entité"] == entity]
 
-            # Sauvegarder dans le ZIP
+            # Transition vers le fichier template
+            buffer = apply_to_template(final_result, input_excel_path)
+
+            # Ajouter au ZIP
             folder_path = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
             file_name = f"{folder_path}/QIS_GRAN_{currency}_{entity}.xlsx"
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_file_path = os.path.join(temp_dir, "temp_output.xlsx")
-                try:
-                    final_result.to_excel(temp_file_path, index=False, engine="xlsxwriter")
-                    zipf.write(temp_file_path, arcname=file_name)
-                except PermissionError as e:
-                    print(f"Erreur de permission lors de la création du fichier : {e}")
-                except Exception as e:
-                    print(f"Une erreur inattendue s'est produite : {e}")
+            zipf.writestr(file_name, buffer.getvalue())
 
         else:  # Cas ALL, BILAN, CONSO
             for currency, file_path in preprocessed_data.items():
@@ -351,7 +334,6 @@ def process_qis(preprocessed_data,
                     export_type=export_type,
                 )
 
-                # Appliquer les transformations
                 result_after_entite = qis_processor.filter_and_join_ref_entite(data_import_filtered)
                 result_after_transfo = qis_processor.join_with_ref_transfo(result_after_entite)
                 result_with_dzone_qis = qis_processor.join_with_ref_dzone_qis(result_after_transfo)
@@ -361,23 +343,27 @@ def process_qis(preprocessed_data,
                 final_result_with_adf_qis = qis_processor.join_with_ref_adf_qis(pivoted_and_reordered_result)
                 final_result = qis_processor.add_adjusted_amounts(final_result_with_adf_qis)
 
-                # Sauvegarder le fichier global
+                # Transition vers le fichier template
+                buffer = apply_to_template(final_result, input_excel_path)
+
+                # Ajouter au ZIP
                 folder_path_global = f"{base_folder}/{currency}/Reports_all_entities"
                 file_name_global = f"{folder_path_global}/QIS_{export_type}_{currency}_All_Entities.xlsx"
-                with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                    final_result.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                    zipf.write(temp_file.name, arcname=file_name_global)
-
-                # Sauvegarder les fichiers par entité
-                for entity in final_result["Ref_Entite.entité"].unique():
-                    entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
-                    if entity_data.empty:
-                        continue
-                    folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
-                    file_name_entity = f"{folder_path_entity}/QIS_{export_type}_{currency}_{entity}.xlsx"
-                    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                        entity_data.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                        zipf.write(temp_file.name, arcname=file_name_entity)
+                zipf.writestr(file_name_global, buffer.getvalue())
+                
+                # Ne générer que les rapports globaux si export_type == 'ALL'
+                if export_type == 'ALL':
+                    continue
+                else:
+                    # Sauvegarder les fichiers par entité
+                    for entity in final_result["Ref_Entite.entité"].unique():
+                        entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
+                        if entity_data.empty:
+                            continue
+                        buffer_entity = apply_to_template(entity_data, input_excel_path)
+                        folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
+                        file_name_entity = f"{folder_path_entity}/QIS_{export_type}_{currency}_{entity}.xlsx"
+                        zipf.writestr(file_name_entity, buffer_entity.getvalue())
 
     print("Tous les fichiers QIS ont été ajoutés au ZIP.")
 
@@ -520,40 +506,39 @@ def process_almm(preprocessed_data,
                 with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
                     final_result.to_excel(temp_file.name, index=False, engine="xlsxwriter")
                     zipf.write(temp_file.name, arcname=file_name_global)
-
-                # Sauvegarder les fichiers par entité
-                for entity in final_result["Ref_Entite.entité"].unique():
-                    entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
-                    if entity_data.empty:
-                        continue
-                    folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
-                    file_name_entity = f"{folder_path_entity}/ALMM_{export_type}_{currency}_{entity}.xlsx"
-                    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                        entity_data.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                        zipf.write(temp_file.name, arcname=file_name_entity)
+                
+                # Ne générer que les rapports globaux si export_type == 'ALL'
+                if export_type == 'ALL':
+                    continue
+                else:
+                    # Sauvegarder les fichiers par entité
+                    for entity in final_result["Ref_Entite.entité"].unique():
+                        entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
+                        if entity_data.empty:
+                            continue
+                        folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
+                        file_name_entity = f"{folder_path_entity}/ALMM_{export_type}_{currency}_{entity}.xlsx"
+                        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
+                            entity_data.to_excel(temp_file.name, index=False, engine="xlsxwriter")
+                            zipf.write(temp_file.name, arcname=file_name_entity)
 
     print("Tous les fichiers ALMM ont été ajoutés au ZIP.")
 
 
 
-
-
-
 def process_nsfr(preprocessed_data,
-    data_path, ref_entite_path, ref_transfo_path, ref_nsfr_path, ref_adf_nsfr_path, ref_dzone_nsfr_path, 
-    input_excel_path, run_timestamp, export_type, zip_buffer, entity=None, currency=None, indicator="ALL"
-):
+                 data_path, ref_entite_path, ref_transfo_path, ref_nsfr_path, ref_adf_nsfr_path, ref_dzone_nsfr_path,
+                 input_excel_path, run_timestamp, export_type, zip_buffer, entity=None, currency=None, indicator="ALL"):
     """
-    Processus de traitement des données NSFR avec gestion des exports structurés dans un ZIP.
+    Processus de traitement des données NSFR avec intégration des résultats dans un fichier template
+    et gestion des exports structurés dans un ZIP.
     """
-    # Valider le zip_buffer avant de l'utiliser
     if zip_buffer is None:
         raise ValueError("Le buffer ZIP n'est pas initialisé.")
 
     base_folder = f"RUN_{run_timestamp}_{export_type}"  # Dossier racine dans le ZIP
 
     with zipfile.ZipFile(zip_buffer, 'a') as zipf:
-        # Cas GRAN
         if export_type == "GRAN":
             if not entity or not currency:
                 raise ValueError("Pour un export de type GRAN, une entité et une devise spécifiques doivent être fournies.")
@@ -562,35 +547,29 @@ def process_nsfr(preprocessed_data,
 
             # Filtrer les données pour GRAN
             if isinstance(preprocessed_data, pd.DataFrame):
-                # Si c'est un DataFrame, afficher ses colonnes
                 if "D_CU" not in preprocessed_data.columns:
                     raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
                 filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
             elif isinstance(preprocessed_data, dict):
-                # Si c'est un dictionnaire, accéder à la clé "filtered_data"
                 if "filtered_data" in preprocessed_data:
                     filtered_data = preprocessed_data["filtered_data"]
                     if "D_CU" not in filtered_data.columns:
                         raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
                     filtered_data = filtered_data[filtered_data["D_CU"] == currency]
                 else:
-                    raise ValueError("La clé 'filtered_data' est absente dans preprocessed_lcr_data.")
+                    raise ValueError("La clé 'filtered_data' est absente dans preprocessed_data.")
             else:
-                raise TypeError("preprocessed_lcr_data doit être un DataFrame ou un dictionnaire.")
+                raise TypeError("preprocessed_data doit être un DataFrame ou un dictionnaire.")
 
-            # Vérifier si 'filtered_data' est valide
             if filtered_data.empty:
-                st.error(f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN.")
-
+                raise ValueError(f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN.")
 
             # Étape 2 : Filtrer par indicateur
             if indicator == "BILAN":
                 filtered_data = filtered_data[filtered_data["D_T1"] == "INTER"]
             elif indicator == "CONSO":
                 filtered_data = filtered_data[filtered_data["D_T1"] != "INTER"]
-            elif indicator == "ALL":
-                filtered_data = filtered_data
-            else:
+            elif indicator != "ALL":
                 raise ValueError("Indicateur non pris en charge. Choisissez parmi ALL, BILAN, ou CONSO.")
 
             if filtered_data.empty:
@@ -617,19 +596,17 @@ def process_nsfr(preprocessed_data,
             pivoted_and_reordered_result = nsfr_processor.pivot_and_reorder(grouped_result)
             final_result_with_adf_nsfr = nsfr_processor.join_with_ref_adf_nsfr(pivoted_and_reordered_result)
             final_result = nsfr_processor.add_adjusted_amounts(final_result_with_adf_nsfr)
-            
+
             # Filtrer par entité
             final_result = final_result[final_result["Ref_Entite.entité"] == entity]
 
+            # Transition vers le fichier template
+            buffer = apply_to_template(final_result, input_excel_path)
 
-            # Sauvegarder dans le ZIP
+            # Ajouter au ZIP
             folder_path = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
             file_name = f"{folder_path}/NSFR_GRAN_{currency}_{entity}.xlsx"
-
-            # Utiliser un fichier temporaire
-            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                final_result.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                zipf.write(temp_file.name, arcname=file_name)
+            zipf.writestr(file_name, buffer.getvalue())
 
         else:  # Cas ALL, BILAN, CONSO
             for currency, file_path in preprocessed_data.items():
@@ -669,32 +646,31 @@ def process_nsfr(preprocessed_data,
                 final_result_with_adf_nsfr = nsfr_processor.join_with_ref_adf_nsfr(pivoted_and_reordered_result)
                 final_result = nsfr_processor.add_adjusted_amounts(final_result_with_adf_nsfr)
 
-                # Filtrer par entité
-                if entity:
-                    final_result = final_result[final_result["Ref_Entite.entité"] == entity]
+                # Transition vers le fichier template global
+                buffer = apply_to_template(final_result, input_excel_path)
 
-                # Sauvegarder le fichier global
+                # Ajouter au ZIP
                 folder_path = f"{base_folder}/{currency}/Reports_all_entities"
                 file_name = f"{folder_path}/NSFR_{export_type}_{currency}_All_Entities.xlsx"
-
-                # Utiliser un fichier temporaire
-                with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                    final_result.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                    zipf.write(temp_file.name, arcname=file_name)
-
-                # Sauvegarder les fichiers par entité
-                for entity in final_result["Ref_Entite.entité"].unique():
-                    entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
-                    if entity_data.empty:
-                        continue
-                    folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
-                    file_name_entity = f"{folder_path_entity}/NSFR_{export_type}_{currency}_{entity}.xlsx"
-                    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                        entity_data.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                        zipf.write(temp_file.name, arcname=file_name_entity)
+                zipf.writestr(file_name, buffer.getvalue())
+                
+                # Ne générer que les rapports globaux si export_type == 'ALL'
+                if export_type == 'ALL':
+                    continue
+                
+                
+                else:
+                    # Sauvegarder les fichiers par entité
+                    for entity in final_result["Ref_Entite.entité"].unique():
+                        entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
+                        if entity_data.empty:
+                            continue
+                        buffer_entity = apply_to_template(entity_data, input_excel_path)
+                        folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
+                        file_name_entity = f"{folder_path_entity}/NSFR_{export_type}_{currency}_{entity}.xlsx"
+                        zipf.writestr(file_name_entity, buffer_entity.getvalue())
 
     print("Tous les fichiers NSFR ont été ajoutés au ZIP.")
-
 
 
 
@@ -702,8 +678,8 @@ def process_lcr(preprocessed_lcr_data,
                 data_path, ref_entite_path, ref_transfo_path, ref_lcr_path, ref_adf_lcr_path,
                 input_excel_path, run_timestamp, export_type, zip_buffer, entity=None, currency=None, indicator="ALL"):
     """
-    Processus de traitement des données LCR avec stockage des fichiers générés dans un ZIP en mémoire,
-    structurant les fichiers dans des dossiers.
+    Processus de traitement des données LCR avec transition directe des données dans un fichier template
+    et stockage des fichiers générés dans un ZIP en mémoire.
     """
     base_folder = f"RUN_{run_timestamp}_{export_type}"  # Dossier racine dans le ZIP
 
@@ -716,12 +692,10 @@ def process_lcr(preprocessed_lcr_data,
 
             # Filtrer les données pour GRAN
             if isinstance(preprocessed_lcr_data, pd.DataFrame):
-                # Si c'est un DataFrame, afficher ses colonnes
                 if "D_CU" not in preprocessed_lcr_data.columns:
                     raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
                 filtered_data = preprocessed_lcr_data[preprocessed_lcr_data["D_CU"] == currency]
             elif isinstance(preprocessed_lcr_data, dict):
-                # Si c'est un dictionnaire, accéder à la clé "filtered_data"
                 if "filtered_data" in preprocessed_lcr_data:
                     filtered_data = preprocessed_lcr_data["filtered_data"]
                     if "D_CU" not in filtered_data.columns:
@@ -732,9 +706,8 @@ def process_lcr(preprocessed_lcr_data,
             else:
                 raise TypeError("preprocessed_lcr_data doit être un DataFrame ou un dictionnaire.")
 
-            # Vérifier si 'filtered_data' est valide
             if filtered_data.empty:
-                st.error(f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN.")
+                raise ValueError(f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN.")
 
             # Initialiser le processeur LCR
             lcr_processor = LCR(
@@ -748,7 +721,7 @@ def process_lcr(preprocessed_lcr_data,
                 export_type=export_type,
             )
 
-            # Étapes individuelles de transformation
+            # Étapes de transformation
             result_after_entite = lcr_processor.filter_and_join_ref_entite(filtered_data)
             result_after_transfo = lcr_processor.join_with_ref_transfo(result_after_entite)
             result_after_lcr = lcr_processor.join_with_ref_lcr(result_after_transfo)
@@ -758,12 +731,14 @@ def process_lcr(preprocessed_lcr_data,
             final_result = lcr_processor.add_adjusted_amount(result_with_adf)
             final_result = final_result[final_result["Ref_Entite.entité"] == entity]
 
+            # Transition vers le fichier template
+            buffer = apply_to_template(final_result, input_excel_path)
+
+            # Ajouter au ZIP
             folder_path = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
             file_name = f"{folder_path}/LCR_GRAN_{currency}_{entity}.xlsx"
-
-            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                final_result.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                zipf.write(temp_file.name, arcname=file_name)
+            with zipfile.ZipFile(zip_buffer, "a") as zipf:
+                zipf.writestr(file_name, buffer.getvalue())
 
         else:  # Pour ALL, BILAN, CONSO
             for currency, filtered_data in preprocessed_lcr_data.items():
@@ -800,28 +775,61 @@ def process_lcr(preprocessed_lcr_data,
                 result_with_adf = lcr_processor.join_with_ref_adf_lcr(grouped_result)
                 final_result = lcr_processor.add_adjusted_amount(result_with_adf)
 
-                # Sauvegarder le fichier global
+
+                # Transition vers le fichier template global
+                buffer = apply_to_template(final_result, input_excel_path)
+
+                # Ajouter au ZIP
                 folder_path_global = f"{base_folder}/{currency}/Reports_all_entities"
                 file_name_global = f"{folder_path_global}/LCR_{export_type}_{currency}_All_Entities.xlsx"
-                with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                    final_result.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                    zipf.write(temp_file.name, arcname=file_name_global)
+                with zipfile.ZipFile(zip_buffer, "a") as zipf:
+                    zipf.writestr(file_name_global, buffer.getvalue())
+                    
+                # Ne générer que les rapports globaux si export_type == 'ALL'
+                if export_type == 'ALL':
+                    continue
+                else:
+                    # Sauvegarder les fichiers par entité
+                    for entity in final_result["Ref_Entite.entité"].unique():
+                        entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
+                        if entity_data.empty:
+                            continue
+                        buffer_entity = apply_to_template(entity_data, input_excel_path)
+                        folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
+                        file_name_entity = f"{folder_path_entity}/LCR_{export_type}_{currency}_{entity}.xlsx"
+                        with zipfile.ZipFile(zip_buffer, "a") as zipf:
+                            zipf.writestr(file_name_entity, buffer_entity.getvalue())
 
-                # Sauvegarder les fichiers par entité
-                for entity in final_result["Ref_Entite.entité"].unique():
-                    entity_data = final_result[final_result["Ref_Entite.entité"] == entity]
-                    if entity_data.empty:
-                        continue
-                    folder_path_entity = f"{base_folder}/{currency}/Reports_by_entity/{entity}"
-                    file_name_entity = f"{folder_path_entity}/LCR_{export_type}_{currency}_{entity}.xlsx"
-                    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-                        entity_data.to_excel(temp_file.name, index=False, engine="xlsxwriter")
-                        zipf.write(temp_file.name, arcname=file_name_entity)
 
+def apply_to_template(dataframe, template_path):
+    """
+    Applique les données d'un DataFrame dans un fichier de template.
+    Les colonnes du DataFrame doivent correspondre exactement à celles du template.
+    
+    :param dataframe: DataFrame contenant les données à insérer.
+    :param template_path: Chemin du fichier Excel template.
+    :return: Un buffer contenant le fichier Excel modifié.
+    """
+    buffer = BytesIO()
+    
+    # Charger le template
+    workbook = load_workbook(template_path)
+    sheet = workbook.active  # Utiliser la première feuille
 
+    # Effacer les données existantes dans la feuille (à partir de la 2e ligne)
+    for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
+        for cell in row:
+            cell.value = None
 
+    # Insérer les données du DataFrame dans le template
+    for i, row in enumerate(dataframe.values, start=2):  # Commence à la ligne 2
+        for j, value in enumerate(row, start=1):  # Commence à la colonne 1
+            sheet.cell(row=i, column=j, value=value)
 
-
+    # Sauvegarder dans un buffer en mémoire
+    workbook.save(buffer)
+    buffer.seek(0)
+    return buffer
 
 def add_file_to_zip(zip_buffer, file_path, arcname):
     """
@@ -1071,6 +1079,7 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
         eur_index = hierarchy_df[hierarchy_df['Level 1'] == f'EUR'].index[0]
         filtered_df_1 = hierarchy_df.iloc[all_index:eur_index + 1]
     except IndexError:
+        st.write(hierarchy_df)
         raise ValueError(f"Les valeurs 'ALL' et 'EUR' ne sont pas présentes dans 'Level 1'.")
 
     # Filtrage de 'Level 2' avec 'Reports_by_entity'
@@ -1078,6 +1087,8 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
         reports_by_entity_index = filtered_df_1[filtered_df_1['Level 2'] == 'Reports_by_entity'].index[0]
         filtered_df_2 = filtered_df_1.iloc[reports_by_entity_index:]
     except IndexError:
+        st.write(hierarchy_df)
+        st.write(filtered_df_1)
         raise ValueError(f"Le niveau 'Reports_by_entity' n'est pas trouvé dans 'Level 2'.")
 
     # Liste des entités et des comptages
@@ -1115,11 +1126,11 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
             current_count += 1
 
             # Compter les occurrences des mots-clés spécifiques
-            lcr_count += file_name.count('LCR')
-            aer_count += file_name.count('AER')
-            nsfr_count += file_name.count('NSFR')
-            qis_count += file_name.count('QIS')
-            almm_count += file_name.count('ALMM')
+            lcr_count += file_name.count('LCR_')
+            aer_count += file_name.count('AER_')
+            nsfr_count += file_name.count('NSFR_')
+            qis_count += file_name.count('QIS_')
+            almm_count += file_name.count('ALMM_')
 
     # Ajouter la dernière entité et son comptage (si applicable)
     if last_entity is not None:
@@ -1187,6 +1198,7 @@ def save_excel_with_structure(
 ):
     """
     Structure et sauvegarde les données traitées dans un fichier ZIP avec une hiérarchie organisée.
+    Gère spécifiquement le cas où `export_type == 'ALL'` pour ne sauvegarder que le fichier global.
     """
     base_folder = f"RUN_{run_timestamp}_{export_type}"
 
@@ -1199,15 +1211,19 @@ def save_excel_with_structure(
             st.warning(f"Aucune donnée disponible pour la devise '{currency_key}'.")
             continue
 
-        # Créer les chemins pour les fichiers globaux et spécifiques
+        # Créer les chemins pour les fichiers globaux
         global_folder = f"{base_folder}/{currency_key}/Reports_all_entities"
-        entity_folder = f"{base_folder}/{currency_key}/Reports_by_entity"
-
-        # Fichier global pour toutes les entités
         global_file = f"{global_folder}/LCR_{export_type}_{currency_key}_All_Entities.xlsx"
+
+        # Sauvegarder uniquement le fichier global si export_type == 'ALL'
+        if export_type == 'ALL':
+            save_to_excel(data, template_path, global_file, zip_buffer)
+            continue
+
+        # Sinon, créer également les fichiers par entité
+        entity_folder = f"{base_folder}/{currency_key}/Reports_by_entity"
         save_to_excel(data, template_path, global_file, zip_buffer)
 
-        # Fichiers par entité
         for specific_entity in entity_list:
             entity_data = data[data["Ref_Entite.entité"] == specific_entity]
             if not entity_data.empty:
@@ -1215,6 +1231,8 @@ def save_excel_with_structure(
                 save_to_excel(entity_data, template_path, entity_file, zip_buffer)
 
     st.success("Données sauvegardées avec succès dans le ZIP.")
+
+
 
 if __name__ == "__main__":
     st.title("HIBISCUS Generator.")
@@ -1234,11 +1252,11 @@ if __name__ == "__main__":
     """
     st.markdown(custom_css, unsafe_allow_html=True)
     run_timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    # CSS pour forcer les boutons à occuper toute la largeur de la barre latéral
     # Initialiser l'état de navigation
     if "menu_choice" not in st.session_state:
         st.session_state.menu_choice = "Main"  # Page par défaut
-
-    # CSS pour styliser les boutons
+    # CSS pour forcer les boutons à occuper toute la largeur de la barre latérale
     st.markdown(
         """
         <style>
@@ -1246,17 +1264,23 @@ if __name__ == "__main__":
             display: flex;
             flex-direction: column;
             gap: 10px;
+            width : 100%;
         }
-        .sidebar-buttons button {
-            width: 100%;
-            background-color: #1f77b4;
+        .stButton button {
+            all: unset;
+            display: block;
+            width: 100%;  /* Force le bouton à occuper toute la largeur */
             color: white;
-            border: none;
+            border: 1px solid grey;
             padding: 10px;
             border-radius: 5px;
             font-size: 16px;
             cursor: pointer;
             text-align: center;
+            box-sizing: border-box; /* Assure que le padding est inclus dans la largeur */
+            display :flex;
+            align-items : left;
+            justify-content : left;
         }
         .sidebar-buttons button:hover {
             background-color: #105ea2;
@@ -1273,14 +1297,16 @@ if __name__ == "__main__":
     st.sidebar.title("Menu")
     st.sidebar.markdown('<div class="sidebar-buttons">', unsafe_allow_html=True)
 
-    if st.sidebar.button("Main"):
+    if st.sidebar.button("Main", key="main_button"):
         st.session_state.menu_choice = "Main"
-    if st.sidebar.button("Export"):
+    if st.sidebar.button("Export", key="export_button"):
         st.session_state.menu_choice = "Export"
-    if st.sidebar.button("Fonctionnalités"):
+    if st.sidebar.button("Fonctionnalités", key="features_button"):
         st.session_state.menu_choice = "Fonctionnalités"
 
     st.sidebar.markdown("</div>", unsafe_allow_html=True)
+
+
 
 
     if st.session_state.menu_choice == "Main" :
@@ -1549,10 +1575,10 @@ if __name__ == "__main__":
                                 zipf.write(hierarchy_file_path, arcname="hierarchy_all.xlsx")
 
                                 # Ajouter le fichier des occurrences uniquement si ce n'est pas GRAN
-                                if export_type != "GRAN":
+                                if export_type != "GRAN" and export_type != "ALL":
                                     count_file_path = os.path.join(temp_dir, "count_all.xlsx")
                                     
-                                    # Obtenir les deux DataFrames
+                                    
                                     grouped_count_df, indicators_df = count_entity_occurrences_from_df(export_type, hierarchy_df)
                                     
                                     # Ajouter les entités manquantes avec 0 occurrences au DataFrame des entités

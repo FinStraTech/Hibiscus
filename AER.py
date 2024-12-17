@@ -392,24 +392,10 @@ class AER:
 
                 all_entities_folder = os.path.join(base_folder, "Reports_all_entities")
                 os.makedirs(all_entities_folder, exist_ok=True)
-
-                by_entity_folder = os.path.join(base_folder, "Reports_by_entity")
-                os.makedirs(by_entity_folder, exist_ok=True)
-
+                
                 # Sauvegarder les fichiers globaux
                 global_file = os.path.join(all_entities_folder, f"AER_ALL_All_Entities_{currency}.xlsx")
                 self.save_to_excel(data, excel_file_path, global_file)
-
-                # Sauvegarder par entité
-                for entity in entity_list:
-                    entity_data = data[data["Ref_Entite.entité"] == entity]
-                    entity_folder = os.path.join(by_entity_folder, entity)
-                    os.makedirs(entity_folder, exist_ok=True)
-
-                    if not entity_data.empty:
-                        entity_file = os.path.join(entity_folder, f"AER_ALL_{currency}_{entity}.xlsx")
-                        self.save_to_excel(entity_data, excel_file_path, entity_file)
-                        print(f"Fichier sauvegardé : {entity_file}")
                         
     def save_to_excel(self, data: pd.DataFrame, template_path: str, output_path: str):
         """

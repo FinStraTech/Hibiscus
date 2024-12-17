@@ -46,7 +46,7 @@ class LCR:
                 print(f"Aucune donnée trouvée pour la devise {currency} dans {export_type}.")
                 continue
 
-            file_name = f"VIEW_{export_type}_IG_{currency}.xlsx"
+            file_name = f"IMPORT_{export_type}_{currency}.xlsx"
             file_path = os.path.join(import_folder, file_name)
 
             try:
@@ -152,50 +152,64 @@ class LCR:
 
             return filtered_data_currency
 
-        # Étape 2 : Génération des fichiers pour BILAN, CONSO, et ALL
         generated_files = {}
-        if export_type in ["ALL", "BILAN"]:
+        all_data_accumulated = []  # Liste pour accumuler toutes les données
+
+        if export_type in ["ALL", "BILAN", "CONSO", "GRAN"]:
             filtered_bilan = self.data[self.data["D_T1"] == "INTER"]
-            generated_files.update(self._save_import_files(filtered_bilan, import_folder, "BILAN"))
-        if export_type in ["ALL", "CONSO"]:
             filtered_conso = self.data[self.data["D_T1"] != "INTER"]
-            generated_files.update(self._save_import_files(filtered_conso, import_folder, "CONSO"))
-        if export_type == "ALL":
-            generated_files.update(self._save_import_files(self.data, import_folder, "ALL"))
+            generated_files.update(self._save_import_files(filtered_bilan, "BILAN", import_folder, filtered_conso, "CONSO", all_data_accumulated))
+
+        # Sauvegarde finale de toutes les données combinées
+        final_data = pd.concat(all_data_accumulated, ignore_index=True)
+        final_file_path = os.path.join(import_folder, "data_import_final.xlsx")
+        try:
+            final_data.to_excel(final_file_path, index=False, engine="xlsxwriter")
+            print(f"Fichier final combiné généré : {final_file_path}")
+            generated_files["data_import_final"] = final_file_path
+        except Exception as e:
+            print(f"Erreur lors de la génération du fichier final : {e}")
 
         print(f"Fichiers d'import sauvegardés dans : {import_folder}")
         return generated_files
 
 
-    def _save_import_files(self, filtered_data, import_folder, export_type):
+    def _save_import_files(self, filtered_data_1, export_type_1, import_folder,filtered_data_2, export_type_2):
         """
         Sauvegarde les fichiers d'import dans le dossier spécifié par devise (ALL, EUR, USD).
 
         :param filtered_data: DataFrame filtré.
         :param import_folder: Dossier où sauvegarder les fichiers.
         :param export_type: Type d'export (ALL, BILAN, CONSO).
+        :param all_data_accumulated: Liste pour accumuler les données.
         :return: Dictionnaire contenant les chemins des fichiers générés.
         """
         saved_files = {}
+
         for currency in ["ALL", "EUR", "USD"]:
             if currency == "ALL":
-                data_to_save = filtered_data
+                data_to_save_1 = filtered_data_1
+                data_to_save_2 = filtered_data_2
             else:
-                data_to_save = filtered_data[filtered_data["D_CU"] == currency]
+                data_to_save_1 = filtered_data_1[filtered_data_1["D_CU"] == currency]
+                data_to_save_2 = filtered_data_2[filtered_data_2["D_CU"] == currency]
 
-            # Vérifications avant sauvegarde
-            if data_to_save.empty:
+            if data_to_save_1.empty or data_to_save_2.empty:
                 print(f"Aucune donnée trouvée pour la devise {currency} dans {export_type}.")
                 continue
 
-            file_name = f"VIEW_{export_type}_IG_{currency}.xlsx"
-            file_path = os.path.join(import_folder, file_name)
+            file_name_1 = f"IMPORT_{export_type_1}_{currency}.xlsx"
+            file_name_2 = f"IMPORT_{export_type_2}_{currency}.xlsx"
+            file_path_1 = os.path.join(import_folder, file_name_1)
+            file_path_2 = os.path.join(import_folder, file_name_2)
             try:
-                data_to_save.to_excel(file_path, index=False, engine="xlsxwriter")
-                print(f"Fichier généré : {file_path}")
-                saved_files[currency] = file_path
+                data_to_save_1.to_excel(file_path_1, index=False, engine="xlsxwriter")
+                data_to_save_2.to_excel(file_path_2, index=False, engine="xlsxwriter")
+                print(f"Fichier généré : {file_path_1} et {file_path_2}")
+                saved_files[currency] = file_path_1
+                saved_files[currency] = file_path_2
             except Exception as e:
-                print(f"Erreur lors de la génération du fichier {file_path}: {e}")
+                print(f"Erreur lors de la génération du fichier {file_path_1} ou {file_path_2}: {e}")
 
         return saved_files
 
