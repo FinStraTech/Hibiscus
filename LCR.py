@@ -153,23 +153,12 @@ class LCR:
             return filtered_data_currency
 
         generated_files = {}
-        all_data_accumulated = []  # Liste pour accumuler toutes les données
-
-        if export_type in ["ALL", "BILAN", "CONSO", "GRAN"]:
+        #Étape 2 : Génération des fichiers pour BILAN, CONSO, et ALL
+        generated_files = {}
+        if export_type in ["ALL", "BILAN","CONSO","GRAN"]:
             filtered_bilan = self.data[self.data["D_T1"] == "INTER"]
             filtered_conso = self.data[self.data["D_T1"] != "INTER"]
             generated_files.update(self._save_import_files(filtered_bilan, "BILAN", import_folder, filtered_conso, "CONSO"))
-
-        # Sauvegarde finale de toutes les données combinées
-        final_data = pd.concat(all_data_accumulated, ignore_index=True)
-        final_file_path = os.path.join(import_folder, "data_import_final.xlsx")
-        try:
-            final_data.to_excel(final_file_path, index=False, engine="xlsxwriter")
-            print(f"Fichier final combiné généré : {final_file_path}")
-            generated_files["data_import_final"] = final_file_path
-        except Exception as e:
-            print(f"Erreur lors de la génération du fichier final : {e}")
-
         print(f"Fichiers d'import sauvegardés dans : {import_folder}")
         return generated_files
 
