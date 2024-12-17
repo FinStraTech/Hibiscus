@@ -751,7 +751,6 @@ def process_lcr(preprocessed_lcr_data,
             print(f"Écriture dans le ZIP : {file_name}")
             zipf.writestr(file_name, buffer.getvalue())
 
-
         else:  # Pour ALL, BILAN, CONSO
             for currency, filtered_data in preprocessed_lcr_data.items():
                 if isinstance(filtered_data, str):
@@ -955,19 +954,13 @@ def save_hierarchy_to_excel_from_directory(base_dir, output_file):
     print(f"Hiérarchie sauvegardée dans le fichier : {output_file}")
 
 def replace_duplicates_with_nan(hierarchy_df):
-    """
-    Remplace les doublons dans chaque colonne de niveau par NaN, sauf pour la première occurrence,
-    en utilisant une liste pour suivre les valeurs uniques.
-    :param hierarchy_df: DataFrame contenant la hiérarchie.
-    :return: DataFrame modifié avec les doublons remplacés par NaN.
-    """
-    if not hierarchy_df.empty:
-        for column in hierarchy_df.columns:
-            seen_values = []  # Liste pour suivre les valeurs uniques
-            hierarchy_df[column] = hierarchy_df[column].apply(
-                lambda x: x if x not in seen_values and not seen_values.append(x) else float('nan')
-            )
-        return hierarchy_df
+
+    for column in hierarchy_df.columns:
+        seen_values = []  # Liste pour suivre les valeurs uniques
+        hierarchy_df[column] = hierarchy_df[column].apply(
+            lambda x: x if x not in seen_values and not seen_values.append(x) else float('nan')
+        )
+    return hierarchy_df
 
 
 def remove_duplicate_xlsx_files(hierarchy_df: pd.DataFrame) -> pd.DataFrame:
@@ -1531,12 +1524,6 @@ if __name__ == "__main__":
                             if export_type == "GRAN":
                                 if "filtered_data" in preprocessed_data:
                                     gran_data = preprocessed_data["filtered_data"]
-
-                                    # Sauvegarder les données filtrées pour GRAN dans un fichier Excel
-                                    gran_file_path = os.path.join(temp_dir, f"GRAN_filtered_data_{run_timestamp}.xlsx")
-                                    gran_data.to_excel(gran_file_path, index=False)
-
-                                    generated_import_files = {"GRAN": gran_file_path}
                                 else:
                                     st.write("Les données filtrées pour GRAN sont absentes.")
                             else:
@@ -1616,92 +1603,89 @@ if __name__ == "__main__":
                             hierarchy_file_path = os.path.join(temp_dir, "hierarchy_all.xlsx")
                             hierarchy_df = extract_hierarchy_from_zip(zip_buffer)
                             hierarchy_df = replace_duplicates_with_nan(hierarchy_df)
-                            if not hierarchy_df.empty :
-                                hierarchy_df.to_excel(hierarchy_file_path, index=False)
 
-                                current_task_placeholder.text("Ajout des fichiers au ZIP final...")
-                                with zipfile.ZipFile(zip_buffer, "a") as zipf:
-                                    for key, import_file_path in generated_import_files.items():
-                                        arcname = f"import_{run_timestamp}/{os.path.basename(import_file_path)}"
-                                        zipf.write(import_file_path, arcname=arcname)
+                            hierarchy_df.to_excel(hierarchy_file_path, index=False)
 
-                                    # Ajouter le fichier de hiérarchie
-                                    zipf.write(hierarchy_file_path, arcname="hierarchy_all.xlsx")
+                            current_task_placeholder.text("Ajout des fichiers au ZIP final...")
+                            with zipfile.ZipFile(zip_buffer, "a") as zipf:
+
+                                # Ajouter le fichier de hiérarchie
+                                zipf.write(hierarchy_file_path, arcname="hierarchy_all.xlsx")
+                                
+                                # Ajouter le fichier des occurrences uniquement si ce n'est pas GRAN
+                                if export_type == 'GRAN':
+                                    if entity == "ALL":
+                                        chosen_entities = Entity_List
+                                    else:
+                                        chosen_entities = [entity]
+
+                                    if "ALL" in selected_processes:
+                                        chosen_indicator = "ALL"
+                                    else:
+                                        # Concaténer les processus sélectionnés pour l'indicateur
+                                        chosen_indicator = ", ".join(selected_processes)
+
+                                    # Appel de la fonction pour GRAN
+                                    grouped_count_df, indicators_df = count_entity_occurrences_from_df(
+                                        export_type="GRAN",
+                                        hierarchy_df=hierarchy_df,
+                                        chosen_entities=chosen_entities,
+                                        chosen_indicator=chosen_indicator
+                                    )
+
+                                    # Ajouter les entités manquantes avec 0 occurrences au DataFrame des entités
+                                    all_entities = set(Entity_List)
+                                    existing_entities = set(grouped_count_df["Entités"])
+                                    missing_entities = all_entities - existing_entities
+
+                                    # Ajouter les entités manquantes au DataFrame
+                                    missing_df = pd.DataFrame({
+                                        "Entités": list(missing_entities),
+                                        "Nombre d'occurrences": [0] * len(missing_entities)
+                                    })
+                                    grouped_count_df = pd.concat([grouped_count_df, missing_df], ignore_index=True)
+
+                                    # Générer le fichier Excel avec les résultats
+                                    count_file_path = os.path.join(temp_dir, "count_gran.xlsx")
+                                    with pd.ExcelWriter(count_file_path, engine='openpyxl') as writer:
+                                        # Écrire le DataFrame des entités
+                                        grouped_count_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=0)
+
+                                        # Ajouter 5 lignes vides avant le DataFrame des indicateurs
+                                        start_row = len(grouped_count_df) + 6  # 1 ligne pour l'en-tête + 5 lignes vides
+                                        indicators_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=start_row)
+
+                                    # Ajouter le fichier Excel dans le ZIP
+                                    zipf.write(count_file_path, arcname="KPI_GRAN.xlsx")
+                                
+                                if export_type != "GRAN" and export_type != "ALL":
+                                    count_file_path = os.path.join(temp_dir, "count_all.xlsx")
+                                                                            
+                                    grouped_count_df, indicators_df = count_entity_occurrences_from_df(export_type, hierarchy_df)
                                     
-                                    # Ajouter le fichier des occurrences uniquement si ce n'est pas GRAN
-                                    if export_type == 'GRAN' :
-                                        if entity == "ALL":
-                                            chosen_entities = Entity_List
-                                        else:
-                                            chosen_entities = [entity]
+                                    # Ajouter les entités manquantes avec 0 occurrences au DataFrame des entités
+                                    all_entities = set(Entity_List)
+                                    existing_entities = set(grouped_count_df["Entités"])
+                                    missing_entities = all_entities - existing_entities
 
-                                        if "ALL" in selected_processes:
-                                            chosen_indicator = "ALL"
-                                        else:
-                                            # Concaténer les processus sélectionnés pour l'indicateur
-                                            chosen_indicator = ", ".join(selected_processes)
+                                    # Ajouter les entités manquantes au DataFrame
+                                    missing_df = pd.DataFrame({
+                                        "Entités": list(missing_entities),
+                                        "Nombre d'occurrences": [0] * len(missing_entities)
+                                    })
+                                    grouped_count_df = pd.concat([grouped_count_df, missing_df], ignore_index=True)
 
-                                        # Appel de la fonction pour GRAN
-                                        grouped_count_df, indicators_df = count_entity_occurrences_from_df(
-                                            export_type="GRAN",
-                                            hierarchy_df=hierarchy_df,
-                                            chosen_entities=chosen_entities,
-                                            chosen_indicator=chosen_indicator
-                                        )
-
-                                        # Ajouter les entités manquantes avec 0 occurrences au DataFrame des entités
-                                        all_entities = set(Entity_List)
-                                        existing_entities = set(grouped_count_df["Entités"])
-                                        missing_entities = all_entities - existing_entities
-
-                                        # Ajouter les entités manquantes au DataFrame
-                                        missing_df = pd.DataFrame({
-                                            "Entités": list(missing_entities),
-                                            "Nombre d'occurrences": [0] * len(missing_entities)
-                                        })
-                                        grouped_count_df = pd.concat([grouped_count_df, missing_df], ignore_index=True)
-
-                                        # Générer le fichier Excel avec les résultats
-                                        count_file_path = os.path.join(temp_dir, "count_gran.xlsx")
-                                        with pd.ExcelWriter(count_file_path, engine='openpyxl') as writer:
-                                            # Écrire le DataFrame des entités
-                                            grouped_count_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=0)
-
-                                            # Ajouter 5 lignes vides avant le DataFrame des indicateurs
-                                            start_row = len(grouped_count_df) + 6  # 1 ligne pour l'en-tête + 5 lignes vides
-                                            indicators_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=start_row)
-
-                                        # Ajouter le fichier Excel dans le ZIP
-                                        zipf.write(count_file_path, arcname="KPI_GRAN.xlsx")
+                                    # Écrire les deux DataFrames dans un fichier Excel
+                                    with pd.ExcelWriter(count_file_path, engine='openpyxl') as writer:
+                                        # Écrire le premier DataFrame
+                                        grouped_count_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=0)
+                                        
+                                        # Ajouter 5 lignes vides avant le second DataFrame
+                                        start_row = len(grouped_count_df) + 6  # 1 ligne pour l'en-tête + 5 lignes vides
+                                        indicators_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=start_row)
                                     
-                                    if export_type != "GRAN" and export_type != "ALL":
-                                        count_file_path = os.path.join(temp_dir, "count_all.xlsx")
-                                                                               
-                                        grouped_count_df, indicators_df = count_entity_occurrences_from_df(export_type, hierarchy_df)
-                                        
-                                        # Ajouter les entités manquantes avec 0 occurrences au DataFrame des entités
-                                        all_entities = set(Entity_List)
-                                        existing_entities = set(grouped_count_df["Entités"])
-                                        missing_entities = all_entities - existing_entities
-
-                                        # Ajouter les entités manquantes au DataFrame
-                                        missing_df = pd.DataFrame({
-                                            "Entités": list(missing_entities),
-                                            "Nombre d'occurrences": [0] * len(missing_entities)
-                                        })
-                                        grouped_count_df = pd.concat([grouped_count_df, missing_df], ignore_index=True)
-
-                                        # Écrire les deux DataFrames dans un fichier Excel
-                                        with pd.ExcelWriter(count_file_path, engine='openpyxl') as writer:
-                                            # Écrire le premier DataFrame
-                                            grouped_count_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=0)
-                                            
-                                            # Ajouter 5 lignes vides avant le second DataFrame
-                                            start_row = len(grouped_count_df) + 6  # 1 ligne pour l'en-tête + 5 lignes vides
-                                            indicators_df.to_excel(writer, index=False, sheet_name="Résultats", startrow=start_row)
-                                        
-                                        # Ajouter le fichier Excel dans le ZIP
-                                        zipf.write(count_file_path, arcname="KPI.xlsx")
+                                    # Ajouter le fichier Excel dans le ZIP
+                                    zipf.write(count_file_path, arcname="KPI.xlsx")
 
                             progress_bar.progress(90)
 
