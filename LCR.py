@@ -158,7 +158,7 @@ class LCR:
         if export_type in ["ALL", "BILAN", "CONSO", "GRAN"]:
             filtered_bilan = self.data[self.data["D_T1"] == "INTER"]
             filtered_conso = self.data[self.data["D_T1"] != "INTER"]
-            generated_files.update(self._save_import_files(filtered_bilan, "BILAN", import_folder, filtered_conso, "CONSO", all_data_accumulated))
+            generated_files.update(self._save_import_files(filtered_bilan, "BILAN", import_folder, filtered_conso, "CONSO"))
 
         # Sauvegarde finale de toutes les données combinées
         final_data = pd.concat(all_data_accumulated, ignore_index=True)
