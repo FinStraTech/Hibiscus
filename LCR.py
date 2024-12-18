@@ -158,8 +158,7 @@ class LCR:
         if export_type in ["ALL", "BILAN","CONSO","GRAN"]:
             filtered_bilan = self.data[self.data["D_T1"] == "INTER"]
             filtered_conso = self.data[self.data["D_T1"] != "INTER"]
-            for save in self._save_import_files(filtered_bilan, "BILAN", import_folder, filtered_conso, "CONSO") :
-                generated_files.update(save)
+            generated_files.update(self._save_import_files(filtered_bilan, "BILAN", import_folder, filtered_conso, "CONSO"))
         print(f"Fichiers d'import sauvegardés dans : {import_folder}")
         return generated_files
 
@@ -174,8 +173,7 @@ class LCR:
         :param all_data_accumulated: Liste pour accumuler les données.
         :return: Dictionnaire contenant les chemins des fichiers générés.
         """
-        saved_files_1 = {}
-        saved_files_2 = {}
+        saved_files = {}
 
         for currency in ["ALL", "EUR", "USD"]:
             if currency == "ALL":
@@ -197,12 +195,12 @@ class LCR:
                 data_to_save_1.to_excel(file_path_1, index=False, engine="xlsxwriter")
                 data_to_save_2.to_excel(file_path_2, index=False, engine="xlsxwriter")
                 print(f"Fichier généré : {file_path_1} et {file_path_2}")
-                saved_files_1[currency] = file_path_1
-                saved_files_2[currency] = file_path_2
+                saved_files[currency] = file_path_1
+                saved_files[currency] = file_path_2
             except Exception as e:
                 print(f"Erreur lors de la génération du fichier {file_path_1} ou {file_path_2}: {e}")
 
-        return saved_files_1, saved_files_2
+        return saved_files
 
 
 

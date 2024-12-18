@@ -55,17 +55,12 @@ def preprocess_all_data(data_path, ref_entite_path, ref_transfo_path, ref_lcr_pa
     if export_type == "GRAN":
         # Vérification avant filtrage
         print(f"Valeurs uniques dans D_CU : {data_import['D_CU'].unique()}")
-        if currency == "ALL":
-            raise ValueError("Pour un export de type GRAN, une devise spécifique doit être fournie.")
 
         # Filtrage des données par devise
-        filtered_data = data_import[data_import["D_CU"] == currency]
-
-        if filtered_data.empty:
-            raise ValueError(
-                f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN. "
-                f"Valeurs disponibles : {data_import['D_CU'].unique()}"
-            )
+        if currency == "ALL":
+            filtered_data = data_import  # Prendre toutes les devises
+        else:
+            filtered_data = data_import[data_import["D_CU"] == currency]
 
         print("Filtrage réussi pour GRAN. Données disponibles :")
         print(filtered_data.head())  # Log des premières lignes pour vérification
@@ -79,12 +74,6 @@ def preprocess_all_data(data_path, ref_entite_path, ref_transfo_path, ref_lcr_pa
             return preprocessed_data
         else:
             raise ValueError("Le prétraitement des données a échoué pour les exports standard.")
-
-
-
-
-
-
 
 def process_aer(preprocessed_data,
                 data_path, ref_entite_path, ref_transfo_path, ref_aer_path, ref_adf_aer_path,
@@ -108,13 +97,19 @@ def process_aer(preprocessed_data,
             if isinstance(preprocessed_data, pd.DataFrame):
                 if "D_CU" not in preprocessed_data.columns:
                     raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
+                if currency == "ALL":
+                    filtered_data = preprocessed_data
+                else:
+                    filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
             elif isinstance(preprocessed_data, dict):
                 if "filtered_data" in preprocessed_data:
                     filtered_data = preprocessed_data["filtered_data"]
                     if "D_CU" not in filtered_data.columns:
                         raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                    filtered_data = filtered_data[filtered_data["D_CU"] == currency]
+                    if currency == "ALL":
+                        filtered_data = filtered_data
+                    else:
+                        filtered_data = filtered_data[filtered_data["D_CU"] == currency]
                 else:
                     raise ValueError("La clé 'filtered_data' est absente dans preprocessed_data.")
             else:
@@ -256,22 +251,17 @@ def process_qis(
 
             # Filtrer les données pour GRAN
             if isinstance(preprocessed_data, pd.DataFrame):
-                filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
+                if "D_CU" not in preprocessed_data.columns:
+                    raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
+                if currency == "ALL":
+                    filtered_data = preprocessed_data
+                else:
+                    filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
             else:
                 raise TypeError("preprocessed_data doit être un DataFrame pour un export de type GRAN.")
 
-            # Étape 2 : Filtrer par indicateur
-            if indicator == "BILAN":
-                filtered_data = filtered_data[filtered_data["D_T1"] == "INTER"]
-            elif indicator == "CONSO":
-                filtered_data = filtered_data[filtered_data["D_T1"] != "INTER"]
-            elif indicator == "ALL":
-                pass  # Ne rien filtrer
-            else:
-                raise ValueError("Indicateur non pris en charge. Choisissez parmi ALL, BILAN, ou CONSO.")
-
             if filtered_data.empty:
-                raise ValueError(f"Aucune donnée trouvée pour la devise '{currency}' et l'indicateur '{indicator}'.")
+                raise ValueError(f"Aucune donnée trouvée pour la devise '{currency}' dans l'export GRAN.")
 
             # Initialiser la classe QIS
             qis_processor = QIS(
@@ -285,14 +275,12 @@ def process_qis(
                 export_type=export_type,
             )
 
+            # Appliquer les transformations
             result_after_entite = qis_processor.filter_and_join_ref_entite(filtered_data)
             result_after_transfo = qis_processor.join_with_ref_transfo(result_after_entite)
-            result_with_dzone_qis = qis_processor.join_with_ref_dzone_qis(result_after_transfo)
-            result_with_qis = qis_processor.join_with_ref_qis(result_with_dzone_qis)
-            grouped_result = qis_processor.group_and_sum_unadjusted_p_amount(result_with_qis)
-            pivoted_and_reordered_result = qis_processor.pivot_and_reorder(grouped_result)
-            final_result_with_adf_qis = qis_processor.join_with_ref_adf_qis(pivoted_and_reordered_result)
-            final_result = qis_processor.add_adjusted_amounts(final_result_with_adf_qis)
+            result_with_qis = qis_processor.join_with_ref_qis(result_after_transfo)
+            grouped_result = qis_processor.group_and_join_ref_adf_qis(result_with_qis)
+            final_result = qis_processor.add_adjusted_amount(grouped_result)
 
             # Filtrer par entité
             final_result = final_result[final_result["Ref_Entite.entité"] == entity]
@@ -350,7 +338,7 @@ def process_qis(
                 folder_path_global = f"{base_folder}/{currency}/Reports_all_entities"
                 file_name_global = f"{folder_path_global}/QIS_{export_type}_{currency}_All_Entities.xlsx"
                 zipf.writestr(file_name_global, buffer.getvalue())
-                
+
                 # Ne générer que les rapports globaux si export_type == 'ALL'
                 if export_type == 'ALL':
                     continue
@@ -366,10 +354,6 @@ def process_qis(
                         zipf.writestr(file_name_entity, buffer_entity.getvalue())
 
     print("Tous les fichiers QIS ont été ajoutés au ZIP.")
-
-
-
-
 
 def process_almm(preprocessed_data,
     data_path, ref_entite_path, ref_transfo_path, ref_almm_path, ref_adf_almm_path,
@@ -392,14 +376,20 @@ def process_almm(preprocessed_data,
                 # Si c'est un DataFrame, afficher ses colonnes
                 if "D_CU" not in preprocessed_data.columns:
                     raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
+                if currency == "ALL":
+                    filtered_data = preprocessed_data
+                else:
+                    filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
             elif isinstance(preprocessed_data, dict):
                 # Si c'est un dictionnaire, accéder à la clé "filtered_data"
                 if "filtered_data" in preprocessed_data:
                     filtered_data = preprocessed_data["filtered_data"]
                     if "D_CU" not in filtered_data.columns:
                         raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                    filtered_data = filtered_data[filtered_data["D_CU"] == currency]
+                    if currency == "ALL":
+                        filtered_data = filtered_data
+                    else:
+                        filtered_data = filtered_data[filtered_data["D_CU"] == currency]
                 else:
                     raise ValueError("La clé 'filtered_data' est absente dans preprocessed_lcr_data.")
             else:
@@ -525,7 +515,6 @@ def process_almm(preprocessed_data,
     print("Tous les fichiers ALMM ont été ajoutés au ZIP.")
 
 
-
 def process_nsfr(preprocessed_data,
                  data_path, ref_entite_path, ref_transfo_path, ref_nsfr_path, ref_adf_nsfr_path, ref_dzone_nsfr_path,
                  input_excel_path, run_timestamp, export_type, zip_buffer, entity=None, currency=None, indicator="ALL"):
@@ -549,13 +538,19 @@ def process_nsfr(preprocessed_data,
             if isinstance(preprocessed_data, pd.DataFrame):
                 if "D_CU" not in preprocessed_data.columns:
                     raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
+                if currency == "ALL":
+                    filtered_data = preprocessed_data
+                else:
+                    filtered_data = preprocessed_data[preprocessed_data["D_CU"] == currency]
             elif isinstance(preprocessed_data, dict):
                 if "filtered_data" in preprocessed_data:
                     filtered_data = preprocessed_data["filtered_data"]
                     if "D_CU" not in filtered_data.columns:
                         raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                    filtered_data = filtered_data[filtered_data["D_CU"] == currency]
+                    if currency == "ALL":
+                        filtered_data = filtered_data
+                    else:
+                        filtered_data = filtered_data[filtered_data["D_CU"] == currency]
                 else:
                     raise ValueError("La clé 'filtered_data' est absente dans preprocessed_data.")
             else:
@@ -694,13 +689,19 @@ def process_lcr(preprocessed_lcr_data,
             if isinstance(preprocessed_lcr_data, pd.DataFrame):
                 if "D_CU" not in preprocessed_lcr_data.columns:
                     raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                filtered_data = preprocessed_lcr_data[preprocessed_lcr_data["D_CU"] == currency]
+                if currency == "ALL":
+                    filtered_data = preprocessed_lcr_data
+                else:
+                    filtered_data = preprocessed_lcr_data[preprocessed_lcr_data["D_CU"] == currency]
             elif isinstance(preprocessed_lcr_data, dict):
                 if "filtered_data" in preprocessed_lcr_data:
                     filtered_data = preprocessed_lcr_data["filtered_data"]
                     if "D_CU" not in filtered_data.columns:
                         raise KeyError("La colonne 'D_CU' est absente dans les données prétraitées pour GRAN.")
-                    filtered_data = filtered_data[filtered_data["D_CU"] == currency]
+                    if currency == "ALL":
+                        filtered_data = filtered_data
+                    else:
+                        filtered_data = filtered_data[filtered_data["D_CU"] == currency]
                 else:
                     raise ValueError("La clé 'filtered_data' est absente dans preprocessed_lcr_data.")
             else:
@@ -878,6 +879,8 @@ def execute_processes_in_parallel(processes):
     Format : [(fonction, (arg1, arg2, ...)), ...]
     :return: Résultats et erreurs des processus.
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
     results = {}
     errors = {}
 
@@ -1128,6 +1131,7 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
         eur_index = hierarchy_df[hierarchy_df['Level 1'] == f'EUR'].index[0]
         filtered_df_1 = hierarchy_df.iloc[all_index:eur_index + 1]
     except IndexError:
+        st.write(hierarchy_df)
         raise ValueError(f"Les valeurs 'ALL' et 'EUR' ne sont pas présentes dans 'Level 1'.")
 
     # Filtrage de 'Level 2' avec 'Reports_by_entity'
@@ -1199,11 +1203,6 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
     })
 
     return grouped_result_df, indicators_df
-
-
-
-
-
 
 def save_to_excel(data: pd.DataFrame, template_path: str, output_path: str, zip_buffer: zipfile.ZipFile):
     """
@@ -1280,6 +1279,51 @@ def save_excel_with_structure(
     st.success("Données sauvegardées avec succès dans le ZIP.")
 
 
+def generate_import_files(uploaded_data, run_timestamp, zip_buffer, import_folder):
+        """
+        Génère les fichiers d'import BILAN et CONSO pour les devises ALL, EUR, et USD,
+        et les ajoute dans un dossier compressé au sein du ZIP final.
+
+        :param uploaded_data: DataFrame chargé depuis le fichier téléchargé.
+        :param run_timestamp: Timestamp pour nommer le dossier d'import.
+        :param zip_buffer: Buffer ZIP où les fichiers seront ajoutés.
+        :param import_folder: Nom du dossier où placer les fichiers dans le ZIP.
+        """
+        # Filtrages
+        bilan_data = uploaded_data[uploaded_data["D_T1"] == "INTER"]
+        conso_data = uploaded_data[uploaded_data["D_T1"] != "INTER"]
+
+        # Itération sur les devises
+        for curr in ["ALL", "EUR", "USD"]:
+            if curr == "ALL":
+                bilan_filtered = bilan_data
+                conso_filtered = conso_data
+            else:
+                bilan_filtered = bilan_data[bilan_data["D_CU"] == curr]
+                conso_filtered = conso_data[conso_data["D_CU"] == curr]
+
+            # Génération des fichiers
+            bilan_file = f"{import_folder}/IMPORT_BILAN_{curr}.xlsx"
+            conso_file = f"{import_folder}/IMPORT_CONSO_{curr}.xlsx"
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_bilan_file:
+                bilan_filtered.to_excel(temp_bilan_file.name, index=False, engine="xlsxwriter")
+                with zipfile.ZipFile(zip_buffer, "a") as zipf:
+                    zipf.write(temp_bilan_file.name, arcname=bilan_file)
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_conso_file:
+                conso_filtered.to_excel(temp_conso_file.name, index=False, engine="xlsxwriter")
+                with zipfile.ZipFile(zip_buffer, "a") as zipf:
+                    zipf.write(temp_conso_file.name, arcname=conso_file)
+
+        # Sauvegarder le fichier importé brut
+        imported_file = f"{import_folder}/IMPORT_SOURCE.xlsx"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_imported_file:
+            uploaded_data.to_excel(temp_imported_file.name, index=False, engine="xlsxwriter")
+            with zipfile.ZipFile(zip_buffer, "a") as zipf:
+                zipf.write(temp_imported_file.name, arcname=imported_file)
+
+        print(f"Fichiers d'import sauvegardés dans le dossier : {import_folder}")
 
 if __name__ == "__main__":
     st.title("HIBISCUS Generator.")
@@ -1332,7 +1376,7 @@ if __name__ == "__main__":
         .sidebar-buttons button:hover {
             background-color: #105ea2;
         }
-        .sidebar-buttons button.active {
+        .stButton button.active {
             background-color: #0d4d8c;
         }
         </style>
@@ -1442,7 +1486,7 @@ if __name__ == "__main__":
             # Indicateur, Entité et Devise pour le GRAN
             indicator = st.sidebar.selectbox("Choisissez la vue :", ["ALL", "BILAN", "CONSO"])
             entity = st.sidebar.selectbox("Choisissez l'entité spécifique :", ["ALL"] + Entity_List)
-            currency = st.sidebar.selectbox("Devise spécifique :", ["EUR", "USD"])
+            currency = st.sidebar.selectbox("Devise spécifique :", ["ALL","EUR", "USD"])
             selected_processes = st.sidebar.multiselect(
                 "Sélectionnez les processus à exécuter :",
                 ["ALL", "NSFR", "LCR", "QIS", "ALMM", "AER"],
@@ -1494,6 +1538,8 @@ if __name__ == "__main__":
                     try:
                         # Initialiser le buffer ZIP
                         zip_buffer = io.BytesIO()
+                        
+                        import_folder = f"import_{run_timestamp}"
 
                         with tempfile.TemporaryDirectory() as temp_dir:
                             # Sauvegarder le fichier téléchargé
@@ -1507,6 +1553,7 @@ if __name__ == "__main__":
 
                             # Étape 1 : Prétraitement des données
                             current_task_placeholder.text("Prétraitement des données...")
+                            generate_import_files(uploaded_data, run_timestamp, zip_buffer,import_folder)
                             preprocessed_data = preprocess_all_data(
                                 data_path=input_file_path,
                                 ref_entite_path="./Ref 2/ref_entite.xlsx",
@@ -1524,13 +1571,14 @@ if __name__ == "__main__":
                             if export_type == "GRAN":
                                 if "filtered_data" in preprocessed_data:
                                     gran_data = preprocessed_data["filtered_data"]
+                                    generated_import_files = gran_data  # Le résultat contient les chemins des fichiers générés
+                                    
                                 else:
                                     st.write("Les données filtrées pour GRAN sont absentes.")
                             else:
                                 # Pour les autres types d'export
                                 generated_import_files = preprocessed_data  # Le résultat contient les chemins des fichiers générés
-                                import_folder = os.path.dirname(next(iter(generated_import_files.values()), temp_dir))  # Récupérer le dossier d'import
-
+                                
                             progress_bar.progress(40)
 
                             # Étape 2 : Exécution des processus
