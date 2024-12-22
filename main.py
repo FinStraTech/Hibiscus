@@ -1084,7 +1084,7 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
     """
     Compte les occurrences des entités au niveau 3 dans la hiérarchie et retourne deux DataFrames :
     1. Un DataFrame contenant les entités regroupées et leurs occurrences additionnées.
-    2. Un DataFrame avec les colonnes 'indicateur' et 'Nombre occurrences' pour les mots-clés spécifiques.
+    2. Un DataFrame avec les colonnes 'indicateur' et 'nombre d'occurrences' pour les mots-clés spécifiques.
     
     :param export_type: Le type d'export (e.g., ALL, BILAN, CONSO, GRAN).
     :param hierarchy_df: DataFrame contenant la hiérarchie (niveaux 1 à N).
@@ -1105,22 +1105,22 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
         # Créer un DataFrame pour les entités choisies, chaque entité ayant une occurrence de 1
         result_df = pd.DataFrame({
             'Entités': chosen_entities,
-            'Nombre occurrences': [1] * len(chosen_entities)
+            'Nombre d\'occurrences': [1] * len(chosen_entities)
         })
 
-        # Définir le Nombre occurrences pour les indicateurs
+        # Définir le nombre d'occurrences pour les indicateurs
         num_entities = len(chosen_entities)
         if chosen_indicator == "ALL":
-            # Tous les indicateurs reçoivent le même Nombre occurrences
+            # Tous les indicateurs reçoivent le même nombre d'occurrences
             indicators_df = pd.DataFrame({
                 'indicateur': ['LCR', 'AER', 'NSFR', 'QIS', 'ALMM'],
-                'Nombre occurrences': [num_entities] * 5
+                'nombre d\'occurrences': [num_entities] * 5
             })
         else:
-            # Seul l'indicateur choisi reçoit le Nombre occurrences
+            # Seul l'indicateur choisi reçoit le nombre d'occurrences
             indicators_df = pd.DataFrame({
                 'indicateur': [chosen_indicator],
-                'Nombre occurrences': [num_entities]
+                'nombre d\'occurrences': [num_entities]
             })
         
         return result_df, indicators_df
@@ -1187,19 +1187,19 @@ def count_entity_occurrences_from_df(export_type: str, hierarchy_df: pd.DataFram
         entity_list.append(last_entity)
         count_list.append(current_count)
 
-    # Créer un DataFrame pour les entités et leur Nombre occurrences
+    # Créer un DataFrame pour les entités et leur nombre d'occurrences
     result_df = pd.DataFrame({
         'Entités': entity_list,
-        'Nombre occurrences': count_list
+        'Nombre d\'occurrences': count_list
     })
 
     # Regrouper les entités ayant le même nom et additionner leurs occurrences
-    grouped_result_df = result_df.groupby("Entités", as_index=False).agg({"Nombre occurrences": "sum"})
+    grouped_result_df = result_df.groupby("Entités", as_index=False).agg({"Nombre d'occurrences": "sum"})
 
     # Créer un DataFrame pour les mots-clés spécifiques
     indicators_df = pd.DataFrame({
         'indicateur': ['LCR', 'AER', 'NSFR', 'QIS', 'ALMM'],
-        'Nombre occurrences': [lcr_count, aer_count, nsfr_count, qis_count, almm_count]
+        'nombre d\'occurrences': [lcr_count, aer_count, nsfr_count, qis_count, almm_count]
     })
 
     return grouped_result_df, indicators_df
@@ -1242,7 +1242,10 @@ def save_excel_with_structure(
     entity: str = None,
     currency: str = "ALL"
 ):
-
+    """
+    Structure et sauvegarde les données traitées dans un fichier ZIP avec une hiérarchie organisée.
+    Gère spécifiquement le cas où `export_type == 'ALL'` pour ne sauvegarder que le fichier global.
+    """
     base_folder = f"RUN_{run_timestamp}_{export_type}"
 
     if not processed_data:
@@ -1474,21 +1477,6 @@ if __name__ == "__main__":
                 
         # Téléchargement du fichier
         uploaded_file = st.sidebar.file_uploader("Téléchargez votre fichier Excel hiérarchique", type=["xlsx"])
-        if uploaded_file is not None:
-            try:
-                # Charger le fichier en mémoire
-                df = pd.read_excel(uploaded_file)
-
-                # Afficher les données pour confirmation
-                st.write("Aperçu des données :", df.head())
-
-                # Exécuter vos traitements ici
-                st.success("Fichier chargé et traité avec succès !")
-
-            except Exception as e:
-                st.error(f"Erreur lors du chargement du fichier : {e}")
-        else:
-            st.info("Veuillez télécharger un fichier pour commencer.")
         export_type = st.sidebar.selectbox("Choisissez le type d'export :", ["ALL", "BILAN", "CONSO", "GRAN"])
         run_timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         
@@ -1504,8 +1492,9 @@ if __name__ == "__main__":
                 ["ALL", "NSFR", "LCR", "QIS", "ALMM", "AER"],
                 default="ALL"
             )
+
+        # Lancer le traitement
         if st.sidebar.button("Lancer le traitement"):
-            st.info('OUAIS !')
             if uploaded_file:
                 uploaded_data = pd.read_excel(uploaded_file)
                 missing_columns = [col for col in expected_columns if col not in uploaded_data.columns]
@@ -1700,7 +1689,7 @@ if __name__ == "__main__":
                                     # Ajouter les entités manquantes au DataFrame
                                     missing_df = pd.DataFrame({
                                         "Entités": list(missing_entities),
-                                        "Nombre occurrences": [0] * len(missing_entities)
+                                        "Nombre d'occurrences": [0] * len(missing_entities)
                                     })
                                     grouped_count_df = pd.concat([grouped_count_df, missing_df], ignore_index=True)
 
@@ -1730,7 +1719,7 @@ if __name__ == "__main__":
                                     # Ajouter les entités manquantes au DataFrame
                                     missing_df = pd.DataFrame({
                                         "Entités": list(missing_entities),
-                                        "Nombre occurrences": [0] * len(missing_entities)
+                                        "Nombre d'occurrences": [0] * len(missing_entities)
                                     })
                                     grouped_count_df = pd.concat([grouped_count_df, missing_df], ignore_index=True)
 
@@ -1767,7 +1756,6 @@ if __name__ == "__main__":
 
         else:
             st.markdown('<div class="feature-description bold">Importez un fichier et choisissez la méthode pour exporter et autres filtres si nécessaire.</div>', unsafe_allow_html=True)
-            st.info('NOP !') 
 
 
     elif st.session_state.menu_choice == "Fonctionnalités":
