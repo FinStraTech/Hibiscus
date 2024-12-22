@@ -27,7 +27,7 @@
 base="dark"
       `,
                     "main.py": 
-                    ``import pandas as pd
+                    `import pandas as pd
 import os
 import io
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1516,8 +1516,6 @@ if __name__ == "__main__":
 
             except Exception as e:
                 st.error(f"Erreur lors du chargement du fichier : {e}")
-        else:
-            st.info("Veuillez télécharger un fichier pour commencer.")
         export_type = st.sidebar.selectbox("Choisissez le type d'export :", ["ALL", "BILAN", "CONSO", "GRAN"])
         run_timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         
@@ -1534,7 +1532,6 @@ if __name__ == "__main__":
                 default="ALL"
             )
         if st.sidebar.button("Lancer le traitement"):
-            st.info('OUAIS !')
             if uploaded_file:
                 uploaded_data = pd.read_excel(uploaded_file)
                 missing_columns = [col for col in expected_columns if col not in uploaded_data.columns]
@@ -1796,7 +1793,6 @@ if __name__ == "__main__":
 
         else:
             st.markdown('<div class="feature-description bold">Importez un fichier et choisissez la méthode pour exporter et autres filtres si nécessaire.</div>', unsafe_allow_html=True)
-            st.info('NOP !') 
 
 
     elif st.session_state.menu_choice == "Fonctionnalités":
@@ -1897,7 +1893,7 @@ if __name__ == "__main__":
                 except Exception as e:
                     st.error(f"Erreur lors du téléchargement : {e}")
 
-                     `
+                     `,
                     "LCR.py" : {
                         url : "LCR.py"
                     },
@@ -1928,7 +1924,7 @@ if __name__ == "__main__":
                     "./Ref 2/ref_aer_adf.xlsx" : {
                         url : "./Ref 2/ref_aer_adf.xlsx"
                     },
-                    "./Ref 2/ref_aer_adf.xlsx" : {
+                    "./Ref 2/ref_aer.xlsx" : {
                         url : "./Ref 2/ref_aer.xlsx"
                     },
                     "./Ref 2/Ref_ALMM.xlsx" : {
@@ -1954,6 +1950,21 @@ if __name__ == "__main__":
                     },
                     "./Ref 2/ref_transfo_l1.xlsx" : {
                         url : "./Ref 2/ref_transfo_l1.xlsx"
+                    },
+                    "./Livrable/Templates/LCR_Template.xlsx" : {
+                        url : "./Livrable/Templates/LCR_Template.xlsx"
+                    },
+                    "./Livrable/Templates/NSFR_Template.xlsx" : {
+                        url : "./Livrable/Templates/NSFR_Template.xlsx"
+                    },
+                    "./Livrable/Templates/AER_Template.xlsx" : {
+                        url : "./Livrable/Templates/AER_Template.xlsx"
+                    },
+                    "./Livrable/Templates/ALMM_Template.xlsx" : {
+                        url : "./Livrable/Templates/ALMM_Template.xlsx"
+                    },
+                    "./Livrable/Templates/QIS_Template.xlsx" : {
+                        url : "./Livrable/Templates/QIS_Template.xlsx"
                     },
                 },
             requirements: [ "openpyxl", "streamlit", "xlsxwriter"],
